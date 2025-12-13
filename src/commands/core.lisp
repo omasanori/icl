@@ -186,7 +186,7 @@ Optional filter: functions, macros, variables, classes, all, external, internal"
               (lisp-implementation-type)
               (lisp-implementation-version)))
   (format t "  Package:        ~A~%" (package-name *icl-package*))
-  (format t "  History file:   ~A~%" *history-file*)
+  (format t "  History file:   ~A~%" (history-file))
   (format t "  Input count:    ~A~%" *input-count*)
   (format t "  Terminal:       ~A~%" (if (terminal-capable-p) "capable" "dumb")))
 

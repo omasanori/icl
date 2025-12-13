@@ -74,16 +74,26 @@
 ;;; Configuration
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
-(defvar *history-file*
-  (merge-pathnames ".icl_history" (user-homedir-pathname))
-  "Path to persistent command history file.")
+(defvar *history-file* nil
+  "Path to persistent command history file. Computed at runtime.")
+
+(defun history-file ()
+  "Return the history file path, computing it if needed."
+  (or *history-file*
+      (setf *history-file*
+            (merge-pathnames ".icl_history" (user-homedir-pathname)))))
 
 (defvar *history-size* 1000
   "Maximum number of history entries to keep.")
 
-(defvar *config-file*
-  (merge-pathnames ".iclrc" (user-homedir-pathname))
-  "User configuration file path.")
+(defvar *config-file* nil
+  "User configuration file path. Computed at runtime.")
+
+(defun config-file ()
+  "Return the config file path, computing it if needed."
+  (or *config-file*
+      (setf *config-file*
+            (merge-pathnames ".iclrc" (user-homedir-pathname)))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Hooks

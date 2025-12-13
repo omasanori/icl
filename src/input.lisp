@@ -61,7 +61,7 @@
   (handler-case
       (let ((input (linedit:linedit
                     :prompt (make-prompt)
-                    :history (namestring *history-file*))))
+                    :history (namestring (history-file)))))
         (when input
           (string-trim '(#\Space #\Tab) input)))
     ;; Handle EOF (Ctrl-D)

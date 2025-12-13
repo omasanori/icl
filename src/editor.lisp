@@ -18,10 +18,11 @@
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
 (defun load-history ()
-  "Load history from *history-file*."
-  (when (and *history-file* (probe-file *history-file*))
-    (handler-case
-        (with-open-file (in *history-file* :direction :input
+  "Load history from history file."
+  (let ((hfile (history-file)))
+    (when (and hfile (probe-file hfile))
+      (handler-case
+          (with-open-file (in hfile :direction :input
                                            :if-does-not-exist nil)
           (when in
             (let ((entries nil))
@@ -35,20 +36,21 @@
               (when (> (length *editor-history*) *history-size*)
                 (setf *editor-history*
                       (subseq *editor-history* 0 *history-size*))))))
-      (error (e)
-        (declare (ignore e))
-        nil))))
+        (error (e)
+          (declare (ignore e))
+          nil)))))
 
 (defun save-history ()
-  "Save history to *history-file*."
-  (when *history-file*
-    (handler-case
-        (ensure-directories-exist *history-file*)
-      (error () nil))
-    (handler-case
-        (with-open-file (out *history-file* :direction :output
-                                            :if-exists :supersede
-                                            :if-does-not-exist :create)
+  "Save history to history file."
+  (let ((hfile (history-file)))
+    (when hfile
+      (handler-case
+          (ensure-directories-exist hfile)
+        (error () nil))
+      (handler-case
+          (with-open-file (out hfile :direction :output
+                                     :if-exists :supersede
+                                     :if-does-not-exist :create)
           ;; Save newest-first (reverse to get oldest-first in file)
           (let ((to-save (if (> (length *editor-history*) *history-size*)
                              (subseq *editor-history* 0 *history-size*)
@@ -56,9 +58,9 @@
             (dolist (entry (reverse to-save))
               ;; Replace newlines with escaped version for storage
               (write-line (encode-history-entry entry) out))))
-      (error (e)
-        (declare (ignore e))
-        nil))))
+        (error (e)
+          (declare (ignore e))
+          nil)))))
 
 (defun encode-history-entry (entry)
   "Encode a history entry for file storage (handle multi-line)."

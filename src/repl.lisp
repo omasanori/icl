@@ -68,15 +68,16 @@
 
 (defun load-user-config ()
   "Load user configuration file if it exists."
-  (when (probe-file *config-file*)
-    (handler-case
-        (progn
-          (load *config-file* :verbose nil :print nil)
-          (format t "~&; Loaded ~A~%" *config-file*))
-      (error (e)
-        (format *error-output*
-                "~&; Warning: Error loading ~A: ~A~%"
-                *config-file* e)))))
+  (let ((cfile (config-file)))
+    (when (probe-file cfile)
+      (handler-case
+          (progn
+            (load cfile :verbose nil :print nil)
+            (format t "~&; Loaded ~A~%" cfile))
+        (error (e)
+          (format *error-output*
+                  "~&; Warning: Error loading ~A: ~A~%"
+                  cfile e))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Full REPL with Configuration
