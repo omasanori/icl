@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: ['*']
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          dnf install -y sbcl libfixposix-devel gcc make curl jq
+          # Install ocicl from GitHub releases (get latest x86_64 rpm)
+          OCICL_RPM_URL=$(curl -sL https://api.github.com/repos/ocicl/ocicl/releases/latest | jq -r '.assets[] | select(.name | endswith("x86_64.rpm")) | .browser_download_url')
+          curl -sL "$OCICL_RPM_URL" -o /tmp/ocicl.rpm
+          dnf install -y /tmp/ocicl.rpm
+
+      - name: Build
+        run: make
+
+      - name: Lint
+        run: |
+          ocicl lint icl.asd || true
+
+      - name: Test binary
+        run: |
+          ./icl --version
+          ./icl --help
