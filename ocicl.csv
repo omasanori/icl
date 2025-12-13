@@ -19,6 +19,7 @@ clingon.intro, ghcr.io/ocicl/clingon@sha256:5d3babf7af5b0e7bfba2bfa9d384f70810ae
 clingon.test, ghcr.io/ocicl/clingon@sha256:5d3babf7af5b0e7bfba2bfa9d384f70810ae6e538f899f0aba7e0b1308eee2eb, clingon-20251121-ef0528f/clingon.test.asd
 deploy, ghcr.io/ocicl/deploy@sha256:088c79a20c36dc46364c2246f8744b9286204e53e2c31e842e49c19940a12124, deploy-20250813-5ccede9/deploy.asd
 deploy-test, ghcr.io/ocicl/deploy@sha256:088c79a20c36dc46364c2246f8744b9286204e53e2c31e842e49c19940a12124, deploy-20250813-5ccede9/test/deploy-test.asd
+documentation-utils, ghcr.io/ocicl/documentation-utils@sha256:b2a1b3f3bcd1a738af85ae2b0168d408c177661eab6d6bbebb254e394d983f54, documentation-utils-20230511-98630dd/documentation-utils.asd
 global-vars, ghcr.io/ocicl/global-vars@sha256:d197e871c9c9abc4bf31b1186f5fd28f0ca848ebe2e9dddf2d82ecee01dbdc65, global-vars-20240503-c749f32/global-vars.asd
 global-vars-test, ghcr.io/ocicl/global-vars@sha256:d197e871c9c9abc4bf31b1186f5fd28f0ca848ebe2e9dddf2d82ecee01dbdc65, global-vars-20240503-c749f32/global-vars-test.asd
 idna, ghcr.io/ocicl/idna@sha256:b1737dbce42904f75c724350c3e057770c7777f1f5596c6358875dfb2e542eac, idna-20240503-bf789e6/idna.asd
@@ -29,7 +30,11 @@ iolib.common-lisp, ghcr.io/ocicl/iolib@sha256:953f1cb142e647da50562d51eca562afc2
 iolib.conf, ghcr.io/ocicl/iolib@sha256:953f1cb142e647da50562d51eca562afc2c5b941b89ae622332b53c7dbed7e1b, iolib-20240503-396cc43/iolib.conf.asd
 iolib.examples, ghcr.io/ocicl/iolib@sha256:953f1cb142e647da50562d51eca562afc2c5b941b89ae622332b53c7dbed7e1b, iolib-20240503-396cc43/iolib.examples.asd
 linedit, ghcr.io/ocicl/linedit@sha256:554f70e207be3c0685b2217836222e66d5cdf584bb2785d47cfad7af7c8b342f, linedit-20240503-0561c97/linedit.asd
+multilang-documentation-utils, ghcr.io/ocicl/documentation-utils@sha256:b2a1b3f3bcd1a738af85ae2b0168d408c177661eab6d6bbebb254e394d983f54, documentation-utils-20230511-98630dd/multilang-documentation-utils.asd
 osicat, ghcr.io/ocicl/osicat@sha256:48af110420f02e99c37370e48bee10d7c7aada7e563483e1f47e3bc1173545f9, osicat-20251007-68732bd/osicat.asd
+pathname-utils, ghcr.io/ocicl/pathname-utils@sha256:082998dd41f934bbacdbc7695cd61d64ea115cd115f6de33d94b8393b4f44cc2, pathname-utils-20250813-d0d4525/pathname-utils.asd
+pathname-utils-test, ghcr.io/ocicl/pathname-utils@sha256:082998dd41f934bbacdbc7695cd61d64ea115cd115f6de33d94b8393b4f44cc2, pathname-utils-20250813-d0d4525/pathname-utils-test.asd
+sha3, ghcr.io/ocicl/sha3@sha256:556fcc3d3fcba08185de62f7bb090fa233af4f8c68a4d7401992a32e03fb9a70, sha3-20240503-a4baa05/sha3.asd
 slynk, ghcr.io/ocicl/slynk@sha256:16d77f9501fb082806f036b3dffb273d146d851b9465edb5f155fda1c767bcc0, sly-20251213-b01993c/slynk/slynk.asd
 split-sequence, ghcr.io/ocicl/split-sequence@sha256:3a37662eedd99c42995587b9d443c4631f25c4c523091bcca31a27b880585b8e, split-sequence-2.0.1/split-sequence.asd
 swap-bytes, ghcr.io/ocicl/swap-bytes@sha256:06edc17deb0f27cdf6290689711ece670a8282dfd07b732a9adc541af1ce7ed6, swap-bytes-20240503-43ab141/swap-bytes.asd
@@ -38,6 +43,7 @@ termp, ghcr.io/ocicl/termp@sha256:ba7560e90b5d1936610e082bfcaab159c4c739fd6d1e69
 trivial-features, ghcr.io/ocicl/trivial-features@sha256:e278e24d39060fc7d3715531b16ddd9ab7f93f22ade53e436c0b86dbae3aa065, trivial-features-1.0/trivial-features.asd
 trivial-features-tests, ghcr.io/ocicl/trivial-features@sha256:e278e24d39060fc7d3715531b16ddd9ab7f93f22ade53e436c0b86dbae3aa065, trivial-features-1.0/trivial-features-tests.asd
 trivial-garbage, ghcr.io/ocicl/trivial-garbage@sha256:a85dcf4110ad60ae9f6c70970acceb2bf12402ce5326891643d35506059afb1d, trivial-garbage-20240503-3474f64/trivial-garbage.asd
+trivial-indent, ghcr.io/ocicl/trivial-indent@sha256:2969bd1dc3cefd22fd1b0c5aeec664d4217a2593fe03bb043d8b6958aabc8b2a, trivial-indent-20250813-87b35ff/trivial-indent.asd
 uffi, ghcr.io/ocicl/cffi@sha256:d415b2cde8431fb3e7d5fc358fccb4aaa0a028dd8819e14608b4d245d0bff9e4, cffi-20250822-dad3520/uffi-compat/uffi.asd
 usocket, ghcr.io/ocicl/usocket@sha256:282856b819b22a4319ba30a15605ee934aa23292a471fd29ea4d3f2074b3f16d, usocket-0.8.8/usocket.asd
 usocket-server, ghcr.io/ocicl/usocket@sha256:282856b819b22a4319ba30a15605ee934aa23292a471fd29ea4d3f2074b3f16d, usocket-0.8.8/usocket-server.asd

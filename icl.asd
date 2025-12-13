@@ -9,7 +9,6 @@
   :author      "Anthony Green <green@moxielogic.com>"
   :license     "MIT"
   :version     "1.0.0"
-  :defsystem-depends-on (:deploy)
   :depends-on (:clingon
                :version-string
                ;; Input/Terminal
@@ -42,9 +41,8 @@
                   ((:file "registry")
                    (:file "core")))
                  (:file "repl")
-                 (:file "main")
-                 (:file "deploy-config"))))
-  :build-operation "deploy-op"
+                 (:file "main"))))
+  :build-operation "program-op"
   :build-pathname "icl"
   :entry-point "icl:main")
 

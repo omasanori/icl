@@ -41,10 +41,12 @@ make
 # Collect licenses from vendored dependencies
 ocicl collect-licenses >VENDORED-LICENSES.txt
 
-# Install the binary and shared libraries from deploy output
-install -D -m 0755 bin/icl %{buildroot}%{_bindir}/icl
+# Install the binary
+install -D -m 0755 icl %{buildroot}%{_bindir}/icl
+
+# Install shared libraries (libosicat.so)
 mkdir -p %{buildroot}%{_libdir}/icl
-cp -r bin/*.so %{buildroot}%{_libdir}/icl/ 2>/dev/null || true
+find ocicl -name "libosicat.so" -exec install -m 0755 {} %{buildroot}%{_libdir}/icl/ \;
 
 # Install slynk from ocicl sly package
 mkdir -p %{buildroot}%{_datadir}/icl/slynk
