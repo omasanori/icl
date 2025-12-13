@@ -21,7 +21,7 @@ jobs:
 
       - name: Create source tarball
         run: |
-          VERSION=$(grep '^\s*:version' icl.asd | head -1 | sed 's/.*\"\\(.*\\)\".*/\\1/')
+          VERSION=$(grep ':version' icl.asd | head -1 | sed 's/.*:version[[:space:]]*"\([^"]*\)".*/\1/')
           echo "Building version: $VERSION"
           cd ..
           tar czf ~/rpmbuild/SOURCES/icl-${VERSION}.tar.gz --transform "s,^icl,icl-${VERSION}," icl
