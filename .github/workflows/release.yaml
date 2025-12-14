@@ -199,6 +199,11 @@ jobs:
           $VERSION = "${{ github.ref_name }}" -replace '^v', ''
           New-Item -ItemType Directory -Force -Path dist
           Copy-Item icl.exe, README.md, LICENSE, THIRD-PARTY-LICENSES.txt -Destination dist/
+          # Include slynk for backend support
+          $slynkDir = Get-ChildItem -Path ocicl -Filter "sly-*" -Directory | Select-Object -First 1
+          if ($slynkDir) {
+            Copy-Item -Recurse "$($slynkDir.FullName)/slynk" -Destination dist/
+          }
           Compress-Archive -Path dist/* -DestinationPath "icl-${VERSION}-windows-amd64.zip"
 
       - name: Upload Windows artifact
@@ -241,6 +246,8 @@ jobs:
           mkdir -p dist
           cp icl dist/
           cp README.md LICENSE THIRD-PARTY-LICENSES.txt dist/
+          # Include slynk for backend support
+          cp -r ocicl/sly-*/slynk dist/
           cd dist && tar czf ../icl-${VERSION}-macos-arm64.tar.gz *
 
       - name: Upload macOS artifact
@@ -280,6 +287,8 @@ jobs:
           mkdir -p dist
           cp icl dist/
           cp README.md LICENSE THIRD-PARTY-LICENSES.txt dist/
+          # Include slynk for backend support
+          cp -r ocicl/sly-*/slynk dist/
           cd dist && tar czf ../icl-${VERSION}-macos-x64.tar.gz *
 
       - name: Upload macOS artifact
