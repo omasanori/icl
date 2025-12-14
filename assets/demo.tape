@@ -48,10 +48,9 @@ Up
 Sleep 500ms
 Up
 Sleep 500ms
-Down
-Sleep 500ms
+Type "d"
 Enter
-Sleep 1s
+Sleep 2s
 
 # Tab complete after colon
 Type "(string-"
