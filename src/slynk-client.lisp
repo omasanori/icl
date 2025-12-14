@@ -171,3 +171,12 @@
   (slynk-client:slime-eval
    `(cl:funcall (cl:read-from-string "slynk:set-package") ,package-name)
    *slynk-connection*))
+
+(defun slynk-list-threads ()
+  "Get list of all threads from Slynk.
+   Returns (LABELS (ID NAME STATUS ATTRS ...) ...)."
+  (unless *slynk-connected-p*
+    (error "Not connected to backend server"))
+  (slynk-client:slime-eval
+   `(cl:funcall (cl:read-from-string "slynk:list-threads"))
+   *slynk-connection*))

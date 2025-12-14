@@ -626,3 +626,46 @@ Example: ,untrace-all"
   (slynk-client:slime-eval
    '(cl:untrace)
    *slynk-connection*))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Thread Inspection
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(define-command threads ()
+  "List all threads in the inferior Lisp.
+Shows thread ID, name, and status for each thread."
+  (handler-case
+      (let ((thread-data (slynk-list-threads)))
+        (if thread-data
+            (format-thread-list thread-data)
+            (format *error-output* "~&No thread information available~%")))
+    (error (e)
+      (format *error-output* "~&Error listing threads: ~A~%" e))))
+
+(defun format-thread-list (thread-data)
+  "Format and display thread list from Slynk.
+   THREAD-DATA is (LABELS ROW1 ROW2 ...) where LABELS is (:id :name :status ...)."
+  (when (and (listp thread-data) (> (length thread-data) 1))
+    (let* ((labels (first thread-data))
+           (rows (rest thread-data))
+           (id-idx (position :id labels))
+           (name-idx (position :name labels))
+           (status-idx (position :status labels)))
+      ;; Print header
+      (format t "~&~A~%" (colorize "Threads:" *color-cyan*))
+      (format t "~&~60,,,'-A~%" "")
+      ;; Print each thread
+      (dolist (row rows)
+        (let ((id (when id-idx (nth id-idx row)))
+              (name (when name-idx (nth name-idx row)))
+              (status (when status-idx (nth status-idx row))))
+          (format t "~&~A ~A~%"
+                  (colorize (format nil "[~2D]" id) *color-number*)
+                  (colorize (or name "unnamed") *color-symbol*))
+          (format t "     Status: ~A~%"
+                  (colorize (or status "unknown")
+                            (if (string-equal status "Active")
+                                *color-green*
+                                *color-dim*)))))
+      (format t "~&~60,,,'-A~%" "")
+      (format t "~&~A threads total~%" (length rows)))))
