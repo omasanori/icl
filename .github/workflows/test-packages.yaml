@@ -4,7 +4,53 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ========================================
+  # Fetch dependencies on Linux using ocicl
+  # ========================================
+  fetch-deps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install ocicl (Linux)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y sbcl curl jq
+          OCICL_URL=$(curl -sL -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/repos/ocicl/ocicl/releases/latest | \
+            jq -r '.assets[] | select(.name | endswith("_amd64.deb")) | .browser_download_url')
+          curl -sL "$OCICL_URL" -o /tmp/ocicl.deb
+          sudo dpkg -i /tmp/ocicl.deb
+          ocicl setup > ~/.sbclrc
+
+      - name: Fetch Lisp dependencies
+        run: ocicl install
+
+      - name: Collect third-party licenses
+        run: ocicl collect-licenses > THIRD-PARTY-LICENSES.txt
+
+      - name: Upload ocicl directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocicl-deps
+          path: ocicl
+          retention-days: 1
+
+      - name: Upload licenses file
+        uses: actions/upload-artifact@v4
+        with:
+          name: licenses
+          path: THIRD-PARTY-LICENSES.txt
+          retention-days: 1
+
+  # ========================================
+  # Test RPM package building
+  # ========================================
   test-rpm:
+    needs: fetch-deps
     runs-on: ubuntu-latest
     container:
       image: fedora:latest
@@ -12,17 +58,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download ocicl dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: ocicl-deps
+          path: ocicl
+
+      - name: Download licenses
+        uses: actions/download-artifact@v4
+        with:
+          name: licenses
+
       - name: Install build dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          dnf install -y rpm-build rpmdevtools sbcl libfixposix-devel gcc make grep curl jq redhat-rpm-config
-          # Install ocicl from GitHub releases (get latest x86_64 rpm)
-          OCICL_RPM_URL=$(curl -sL -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/ocicl/ocicl/releases/latest | jq -r '.assets[] | select(.name | endswith("x86_64.rpm")) | .browser_download_url')
-          curl -sL "$OCICL_RPM_URL" -o /tmp/ocicl.rpm
-          dnf install -y /tmp/ocicl.rpm
-          ocicl version
-          ocicl setup > ~/.sbclrc
+          dnf install -y rpm-build rpmdevtools sbcl libfixposix-devel gcc make
 
       - name: Setup rpmbuild directory
         run: rpmdev-setuptree
@@ -52,7 +101,11 @@ jobs:
           dnf install -y ~/rpmbuild/RPMS/x86_64/*.rpm
           icl --version || icl -h || true
 
+  # ========================================
+  # Test DEB package building
+  # ========================================
   test-deb:
+    needs: fetch-deps
     runs-on: ubuntu-latest
     container:
       image: debian:stable
@@ -60,18 +113,21 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Download ocicl dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: ocicl-deps
+          path: ocicl
+
+      - name: Download licenses
+        uses: actions/download-artifact@v4
+        with:
+          name: licenses
+
       - name: Install build dependencies
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           apt-get update
-          apt-get install -y debhelper devscripts sbcl libfixposix-dev gcc make curl jq
-          # Install ocicl from GitHub releases (get latest amd64 deb)
-          OCICL_DEB_URL=$(curl -sL -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/ocicl/ocicl/releases/latest | jq -r '.assets[] | select(.name | endswith("amd64.deb")) | .browser_download_url')
-          curl -sL "$OCICL_DEB_URL" -o /tmp/ocicl.deb
-          apt-get install -y /tmp/ocicl.deb
-          ocicl version
-          ocicl setup > ~/.sbclrc
+          apt-get install -y debhelper devscripts sbcl libfixposix-dev gcc make
 
       - name: Build DEB packages (binary and source)
         run: dpkg-buildpackage -uc -us
@@ -87,3 +143,125 @@ jobs:
         run: |
           apt-get install -y ../*.deb
           icl --version || icl -h || true
+
+  # ========================================
+  # Test Windows package building
+  # ========================================
+  test-windows:
+    needs: fetch-deps
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download ocicl dependencies
+        uses: actions/download-artifact@v4
+        with:
+          name: ocicl-deps
+          path: ocicl
+
+      - name: Download licenses
+        uses: actions/download-artifact@v4
+        with:
+          name: licenses
+
+      - name: Install SBCL
+        shell: powershell
+        run: |
+          choco install -y sbcl make
+
+      - name: Build ICL
+        run: make
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(grep ':version' icl.asd | head -1 | sed 's/.*:version[[:space:]]*"\([^"]*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create ZIP package
+        shell: powershell
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item icl.exe, README.md, LICENSE, THIRD-PARTY-LICENSES.txt -Destination dist/
+          # Include slynk for backend support
+          $slynkDir = Get-ChildItem -Path ocicl -Filter "sly-*" -Directory | Select-Object -First 1
+          if ($slynkDir) {
+            Copy-Item -Recurse "$($slynkDir.FullName)/slynk" -Destination dist/
+          }
+          Compress-Archive -Path dist/* -DestinationPath "icl-${VERSION}-windows-amd64.zip"
+          echo "ZIP package created:"
+          Get-ChildItem *.zip
+
+      - name: Build NSIS installer (EXE)
+        shell: powershell
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DVERSION=$VERSION installer\nsis\icl.nsi
+          echo "NSIS installer created:"
+          Get-ChildItem installer\nsis\*.exe
+
+      - name: Install WiX Toolset
+        shell: powershell
+        run: |
+          dotnet tool install --global wix --version 5.0.2
+
+      - name: Build MSI installer
+        shell: powershell
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+          Copy-Item "icl.exe" "installer\wix\"
+          Copy-Item "LICENSE" "installer\wix\"
+          Copy-Item "README.md" "installer\wix\"
+          cd installer\wix
+          wix build icl.wxs -o "icl-$VERSION.msi" -d VERSION=$VERSION -d SourceDir=. -ext WixToolset.UI.wixext
+          echo "MSI installer created:"
+          Get-ChildItem *.msi
+
+      - name: Calculate checksums
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          sha256sum icl-${VERSION}-windows-amd64.zip > checksums-windows.txt
+          sha256sum installer/nsis/icl-${VERSION}-setup.exe >> checksums-windows.txt
+          sha256sum installer/wix/icl-${VERSION}.msi >> checksums-windows.txt
+          cat checksums-windows.txt
+
+      - name: Build Chocolatey package
+        shell: powershell
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          # Get checksum from file
+          $checksumLine = Get-Content checksums-windows.txt | Where-Object { $_ -match "windows-amd64.zip" }
+          $CHECKSUM = ($checksumLine -split '\s+')[0]
+
+          # Update nuspec version
+          (Get-Content chocolatey\icl.nuspec) -replace '<version>.*</version>', "<version>$VERSION</version>" | Set-Content chocolatey\icl.nuspec
+
+          # Update install script with version and checksum
+          (Get-Content chocolatey\tools\chocolateyInstall.ps1) -replace '__VERSION__', $VERSION | Set-Content chocolatey\tools\chocolateyInstall.ps1
+          (Get-Content chocolatey\tools\chocolateyInstall.ps1) -replace '__CHECKSUM__', $CHECKSUM | Set-Content chocolatey\tools\chocolateyInstall.ps1
+
+          cd chocolatey
+          choco pack
+          echo "Chocolatey package created:"
+          Get-ChildItem *.nupkg
+
+      - name: List all built packages
+        run: |
+          echo "=== Windows Packages Built ==="
+          echo "ZIP:"
+          ls -lh *.zip 2>/dev/null || echo "  (none)"
+          echo "NSIS EXE:"
+          ls -lh installer/nsis/*.exe 2>/dev/null || echo "  (none)"
+          echo "MSI:"
+          ls -lh installer/wix/*.msi 2>/dev/null || echo "  (none)"
+          echo "Chocolatey:"
+          ls -lh chocolatey/*.nupkg 2>/dev/null || echo "  (none)"
+          echo ""
+          echo "=== Checksums ==="
+          cat checksums-windows.txt
