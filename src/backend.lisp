@@ -394,10 +394,7 @@
 (defun stop-inferior-lisp ()
   "Stop the inferior Lisp process."
   (when *inferior-process*
-    ;; Try graceful shutdown first
-    (when *slynk-connected-p*
-      (ignore-errors
-        (slynk-client:slime-eval '(cl-user::quit) *slynk-connection*)))
+    ;; Just disconnect - the process will be killed below if needed
     (slynk-disconnect)
     ;; Give it a moment
     (sleep 0.5)

@@ -269,14 +269,14 @@ Use `configure-lisp` to customize how ICL invokes a Lisp implementation:
 
 ICL aims to support multiple Common Lisp implementations. SBCL is the primary development and testing platform.
 
-| Implementation | Status | Notes |
-|---------------|--------|-------|
-| SBCL | Tested | Full support including profiling |
-| CCL | Untested | |
-| ECL | Untested | Requires GCC for compilation |
-| ABCL | Untested | Runs on JVM |
-| Clasp | Untested | |
-| CLISP | Experimental | Known connection issues |
+| Implementation | Status |
+|---------------|--------|
+| SBCL | Tested |
+| CCL | Untested |
+| ECL | Tested |
+| ABCL | Tested |
+| Clasp | Untested |
+| CLISP | Experimental |
 
 ## Architecture
 
