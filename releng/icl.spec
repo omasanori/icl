@@ -51,6 +51,10 @@ echo "%{_libdir}/icl" > %{buildroot}%{_sysconfdir}/ld.so.conf.d/icl.conf
 mkdir -p %{buildroot}%{_datadir}/icl/sly
 cp -r ocicl/sly-*/* %{buildroot}%{_datadir}/icl/sly/
 
+# Install bundled ASDF (for Lisps that don't bundle it, like CLISP)
+mkdir -p %{buildroot}%{_datadir}/icl/asdf
+cp 3rd-party/asdf/asdf.lisp %{buildroot}%{_datadir}/icl/asdf/
+
 # Install collected vendored licenses
 install -D -m 0644 THIRD-PARTY-LICENSES.txt %{buildroot}%{_datadir}/licenses/%{name}/THIRD-PARTY-LICENSES.txt
 
@@ -66,6 +70,7 @@ install -D -m 0644 THIRD-PARTY-LICENSES.txt %{buildroot}%{_datadir}/licenses/%{n
 %{_sysconfdir}/ld.so.conf.d/icl.conf
 %{_datadir}/licenses/%{name}/THIRD-PARTY-LICENSES.txt
 %{_datadir}/icl/sly
+%{_datadir}/icl/asdf
 %{_libdir}/icl
 %{_bindir}/icl
 

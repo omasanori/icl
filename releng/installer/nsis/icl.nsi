@@ -81,6 +81,11 @@ Section "ICL Core" SEC_CORE
   File "..\..\..\THIRD-PARTY-LICENSES.txt"
   File "..\..\..\README.md"
 
+  ; Install bundled ASDF (for Lisps that don't bundle it)
+  SetOutPath "$INSTDIR\3rd-party\asdf"
+  File "..\..\..\3rd-party\asdf\asdf.lisp"
+  SetOutPath "$INSTDIR"
+
   ; Store installation folder
   WriteRegStr HKLM "Software\${PRODUCT_NAME}" "InstallDir" "$INSTDIR"
 
@@ -151,6 +156,11 @@ Section "Uninstall"
   Delete "$INSTDIR\THIRD-PARTY-LICENSES.txt"
   Delete "$INSTDIR\README.md"
   Delete "$INSTDIR\uninstall.exe"
+
+  ; Remove bundled ASDF
+  Delete "$INSTDIR\3rd-party\asdf\asdf.lisp"
+  RMDir "$INSTDIR\3rd-party\asdf"
+  RMDir "$INSTDIR\3rd-party"
 
   ; Remove shortcuts
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\ICL.lnk"

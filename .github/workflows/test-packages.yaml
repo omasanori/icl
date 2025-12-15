@@ -200,6 +200,8 @@ jobs:
           if ($slynkDir) {
             Copy-Item -Recurse "$($slynkDir.FullName)/slynk" -Destination dist/
           }
+          # Include bundled ASDF (for Lisps that don't bundle it)
+          Copy-Item -Recurse "3rd-party" -Destination dist/
           Compress-Archive -Path dist/* -DestinationPath "icl-${VERSION}-windows-amd64.zip"
           echo "ZIP package created:"
           Get-ChildItem *.zip
@@ -228,6 +230,8 @@ jobs:
           Copy-Item "LICENSE" "releng\installer\wix\"
           Copy-Item "README.md" "releng\installer\wix\"
           Copy-Item "THIRD-PARTY-LICENSES.txt" "releng\installer\wix\"
+          # Copy bundled ASDF
+          Copy-Item -Recurse "3rd-party" "releng\installer\wix\"
           cd releng\installer\wix
           wix build icl.wxs -o "icl-$VERSION.msi" -d VERSION=$VERSION -d SourceDir=. -ext WixToolset.UI.wixext
           echo "MSI installer created:"

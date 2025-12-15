@@ -32,6 +32,7 @@
     <!-- Feature definition -->
     <Feature Id="ProductFeature" Title="ICL" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="AsdfComponents" />
       <ComponentGroupRef Id="EnvironmentComponents" />
     </Feature>
 
@@ -44,7 +45,11 @@
   <!-- Directory structure -->
   <Fragment>
     <StandardDirectory Id="ProgramFiles64Folder">
-      <Directory Id="INSTALLFOLDER" Name="ICL" />
+      <Directory Id="INSTALLFOLDER" Name="ICL">
+        <Directory Id="ThirdPartyDir" Name="3rd-party">
+          <Directory Id="AsdfDir" Name="asdf" />
+        </Directory>
+      </Directory>
     </StandardDirectory>
   </Fragment>
 
@@ -62,6 +67,11 @@
       </Component>
       <Component Id="ReadmeFile" Guid="C3D4E5F6-A7B8-9012-CDEF-123456789012">
         <File Id="README.md" Source="$(SourceDir)\README.md" />
+      </Component>
+    </ComponentGroup>
+    <ComponentGroup Id="AsdfComponents" Directory="AsdfDir">
+      <Component Id="AsdfFile" Guid="F6A7B8C9-D0E1-2345-ABCD-567890123456">
+        <File Id="asdf.lisp" Source="$(SourceDir)\3rd-party\asdf\asdf.lisp" KeyPath="yes" />
       </Component>
     </ComponentGroup>
   </Fragment>

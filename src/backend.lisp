@@ -84,6 +84,26 @@
 ;;; Slynk Loader Generation
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
+(defun find-bundled-asdf ()
+  "Find bundled ASDF shipped with ICL.
+   Search order:
+   1. ./3rd-party/asdf/asdf.lisp relative to executable (development)
+   2. /usr/share/icl/asdf/asdf.lisp (installed, Unix only)"
+  (let* ((exe-dir (or (and (boundp 'sb-ext:*runtime-pathname*)
+                           (symbol-value 'sb-ext:*runtime-pathname*)
+                           (uiop:pathname-directory-pathname
+                            (symbol-value 'sb-ext:*runtime-pathname*)))
+                      *default-pathname-defaults*))
+         (local-asdf (merge-pathnames "3rd-party/asdf/asdf.lisp" exe-dir)))
+    (when (probe-file local-asdf)
+      (return-from find-bundled-asdf local-asdf)))
+  ;; System install location (Unix only)
+  #-windows
+  (let ((system-asdf (pathname "/usr/share/icl/asdf/asdf.lisp")))
+    (when (probe-file system-asdf)
+      (return-from find-bundled-asdf system-asdf)))
+  nil)
+
 (defun find-bundled-slynk ()
   "Find bundled Slynk shipped with ICL.
    Search order:
@@ -168,17 +188,26 @@
       ;; Use our embedded minimal Slynk
       (generate-embedded-slynk-init port)
       ;; Try to find system Slynk
-      (let ((slynk-dir (find-slynk-asd)))
-        ;; Verbose: show Slynk path
+      (let ((slynk-dir (find-slynk-asd))
+            (asdf-file (find-bundled-asdf)))
+        ;; Verbose: show paths
         (when *verbose*
-          (format t "~&; Slynk directory: ~A~%" (or slynk-dir "(not found - trying Quicklisp)")))
+          (format t "~&; Slynk directory: ~A~%" (or slynk-dir "(not found - trying Quicklisp)"))
+          (format t "~&; Bundled ASDF: ~A~%" (or asdf-file "(not found)")))
         (if slynk-dir
             ;; Use ASDF to load Slynk (leverages FASL caching)
             ;; Use uiop:unix-namestring to ensure forward slashes on all platforms
             ;; Note: Use read-from-string for asdf: symbols to avoid reader errors
             ;; when ASDF isn't loaded yet (Windows SBCL doesn't preload ASDF)
+            ;; First ensure ASDF is available - some Lisps (CLISP) don't bundle it
             (format nil "(progn
-  (require :asdf)
+  ;; Ensure ASDF is available (some Lisps like CLISP don't bundle it)
+  (unless (find-package :asdf)
+    (handler-case
+        (require :asdf)
+      (error ()~@[
+        ;; ASDF not built in, load bundled version
+        (load ~S)~])))
   (push ~S (symbol-value (read-from-string \"asdf:*central-registry*\")))
   (let ((*debug-io* (make-broadcast-stream)))
     (funcall (read-from-string \"asdf:load-system\") :slynk))
@@ -191,7 +220,9 @@
     (when x (setf (symbol-value x) nil)))
   (funcall (read-from-string \"slynk:create-server\")
            :port ~D :dont-close t))"
-                    (uiop:unix-namestring slynk-dir) port)
+                    (when asdf-file (uiop:unix-namestring asdf-file))
+                    (uiop:unix-namestring slynk-dir)
+                    port)
             ;; Try Quicklisp
             (format nil "(progn
   (unless (find-package :quicklisp)
