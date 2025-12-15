@@ -128,6 +128,7 @@ Commands are prefixed with a comma. Type `,help` for a full list.
 
 | Command | Description |
 |---------|-------------|
+| `,load-system <name>` | Load system via OCICL/Quicklisp/ASDF |
 | `,time <form>` | Time expression evaluation |
 | `,load <file>` | Load a Lisp file |
 | `,compile-file <file>` | Compile a file |

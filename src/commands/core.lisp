@@ -804,6 +804,53 @@ Example: ,dis mapcar"
    *slynk-connection*))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
+;;; System Loading (trivial-system-loader style)
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(define-command (load-system ql) (system-name)
+  "Load a system using OCICL, Quicklisp, or ASDF (whichever is available).
+Tries in order: OCICL (with download), Quicklisp, plain ASDF.
+Example: ,load-system alexandria
+Example: ,ql cl-ppcre"
+  (handler-case
+      (let ((result (slynk-load-system system-name)))
+        (format t "~&~A~%" result))
+    (error (e)
+      (format *error-output* "~&Error loading system: ~A~%" e))))
+
+(defun slynk-load-system (system-name)
+  "Load SYSTEM-NAME via Slynk using trivial-system-loader approach."
+  (unless *slynk-connected-p*
+    (error "Not connected to Slynk server"))
+  (let* ((name (string-trim '(#\Space #\Tab #\") system-name))
+         ;; Code that tries OCICL, then Quicklisp, then ASDF
+         (loader-code (format nil "
+(flet ((try-load ()
+         (let ((system '~A))
+           (cond
+             ;; Try OCICL first
+             ((find-package '#:OCICL-RUNTIME)
+              (progv (list (find-symbol \"*DOWNLOAD*\" '#:OCICL-RUNTIME)
+                           (find-symbol \"*VERBOSE*\" '#:OCICL-RUNTIME))
+                  (list t t)
+                (asdf:load-system system))
+              (format nil \"Loaded ~~A via OCICL\" system))
+             ;; Try Quicklisp
+             ((find-package '#:QUICKLISP)
+              (funcall (find-symbol \"QUICKLOAD\" '#:QUICKLISP) system :silent nil)
+              (format nil \"Loaded ~~A via Quicklisp\" system))
+             ;; Fall back to plain ASDF
+             ((find-package '#:ASDF)
+              (asdf:load-system system)
+              (format nil \"Loaded ~~A via ASDF\" system))
+             (t
+              (error \"No system loader available (OCICL, Quicklisp, or ASDF)\"))))))
+  (try-load))" name)))
+    (slynk-client:slime-eval
+     `(cl:eval (cl:read-from-string ,loader-code))
+     *slynk-connection*)))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Configuration Commands
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
