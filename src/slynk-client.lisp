@@ -89,7 +89,19 @@
                    (force-output stream-out)))))
     (list :ok (mapcar (lambda (v) (write-to-string v :readably nil :pretty nil)) vals)))
   (error (err)
-    (list :error (princ-to-string err)
+    (list :error
+          ;; Clean error message: strip Stream: lines from reader errors
+          (let ((msg (princ-to-string err)))
+            (string-right-trim '(#\\Newline #\\Space)
+              (with-output-to-string (s)
+                (with-input-from-string (in msg)
+                  (loop for line = (read-line in nil nil)
+                        while line
+                        unless (and (> (length line) 2)
+                                    (char= (char line 0) #\\Space)
+                                    (char= (char line 1) #\\Space)
+                                    (search \"Stream:\" line))
+                        do (write-line line s))))))
           (ignore-errors
             #+sbcl (with-output-to-string (s)
                      (sb-debug:print-backtrace :stream s :count 30))
