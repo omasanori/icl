@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ICL - Interactive Common Lisp
+  Chocolatey Package Specification
+
+  SPDX-License-Identifier: MIT
+  Copyright (C) 2025 Anthony Green <green@moxielogic.com>
+
+  To build: choco pack
+  To test locally: choco install icl -s . -y
+-->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>icl</id>
+    <!-- Version is replaced during CI build -->
+    <version>1.4.2</version>
+    <title>ICL - Interactive Common Lisp</title>
+    <authors>Anthony Green</authors>
+    <owners>atgreen</owners>
+    <projectUrl>https://github.com/atgreen/icl</projectUrl>
+    <licenseUrl>https://github.com/atgreen/icl/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/atgreen/icl</projectSourceUrl>
+    <bugTrackerUrl>https://github.com/atgreen/icl/issues</bugTrackerUrl>
+    <tags>lisp common-lisp repl sbcl programming development cli</tags>
+    <summary>An enhanced REPL for Common Lisp</summary>
+    <description><![CDATA[ICL (Interactive Common Lisp) provides a modern, feature-rich REPL for Common Lisp with:
+
+- Multi-line input with readline-style editing
+- Persistent command history
+- Tab completion for symbols and packages
+- Extensible comma-prefixed command system (,help, ,quit, ,info, etc.)
+- Support for multiple Lisp implementations via Slynk
+- Documentation lookup, object inspection, and tracing
+
+## Requirements
+
+ICL requires a Common Lisp implementation to be installed. Supported implementations:
+- SBCL (recommended) - install with: `choco install sbcl`
+- CCL (Clozure CL)
+- ECL (Embeddable Common Lisp)
+- CLISP
+- ABCL (Armed Bear Common Lisp)
+
+## Usage
+
+After installation, run `icl` from the command line:
+
+```
+icl                    # Start REPL (auto-detects Lisp)
+icl --lisp sbcl        # Use specific Lisp implementation
+icl -e "(+ 1 2)"       # Evaluate expression and exit
+icl --help             # Show all options
+```
+
+## REPL Commands
+
+Type `,help` in the REPL to see available commands.
+]]></description>
+    <releaseNotes>https://github.com/atgreen/icl/releases</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

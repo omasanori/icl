@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ICL - Interactive Common Lisp MSI Installer
+  WiX v4 Source
+
+  SPDX-License-Identifier: MIT
+  Copyright (C) 2025 Anthony Green <green@moxielogic.com>
+
+  Build with: wix build icl.wxs -o icl.msi -d VERSION=1.4.2
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Interactive Common Lisp"
+    Manufacturer="Anthony Green"
+    Version="$(VERSION)"
+    UpgradeCode="F8E3C2A1-5B4D-4E6F-9A8B-7C1D2E3F4A5B"
+    Scope="perMachine">
+
+    <SummaryInformation
+      Description="ICL - An enhanced REPL for Common Lisp"
+      Manufacturer="Anthony Green" />
+
+    <!-- Major upgrade configuration -->
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of [ProductName] is already installed."
+      AllowSameVersionUpgrades="yes" />
+
+    <!-- Embed cabinet in MSI -->
+    <MediaTemplate EmbedCab="yes" />
+
+    <!-- Feature definition -->
+    <Feature Id="ProductFeature" Title="ICL" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentGroupRef Id="EnvironmentComponents" />
+    </Feature>
+
+    <!-- UI configuration - use minimal UI -->
+    <UIRef Id="WixUI_Minimal" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
+
+  </Package>
+
+  <!-- Directory structure -->
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="ICL" />
+    </StandardDirectory>
+  </Fragment>
+
+  <!-- Product components -->
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+        <File Id="icl.exe" Source="$(SourceDir)\icl.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="LicenseFile" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
+        <File Id="LICENSE" Source="$(SourceDir)\LICENSE" />
+      </Component>
+      <Component Id="ReadmeFile" Guid="C3D4E5F6-A7B8-9012-CDEF-123456789012">
+        <File Id="README.md" Source="$(SourceDir)\README.md" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+  <!-- Environment variable (PATH) -->
+  <Fragment>
+    <ComponentGroup Id="EnvironmentComponents" Directory="INSTALLFOLDER">
+      <Component Id="PathEnvironment" Guid="D4E5F6A7-B8C9-0123-DEFA-234567890123">
+        <Environment
+          Id="PATH"
+          Name="PATH"
+          Value="[INSTALLFOLDER]"
+          Permanent="no"
+          Part="last"
+          Action="set"
+          System="yes" />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+
+</Wix>
