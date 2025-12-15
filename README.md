@@ -19,7 +19,7 @@ ICL is an enhanced REPL for Common Lisp. It provides a modern, terminal-based in
 - **Error backtraces** - Automatic backtrace capture with `,bt` command to view stack traces
 - **Thread inspection** - List and inspect threads in the inferior Lisp
 - **Documentation lookup** - Quick access to function docs and apropos search
-- **Object inspection** - Inspect objects and view slot values
+- **Interactive object inspector** - TUI for exploring objects with keyboard navigation
 - **Tracing** - Enable/disable function tracing
 - **Source location** - Find where functions are defined
 - **Terminal-aware colors** - Automatically detects light/dark terminal background
@@ -107,8 +107,19 @@ Commands are prefixed with a comma. Type `,help` for a full list.
 
 | Command | Description |
 |---------|-------------|
-| `,inspect <expr>` | Inspect an object |
+| `,inspect <expr>` | Interactive object inspector (alias: `,i`) |
+| `,i` | Inspect last result (`*`) |
+| `,inspect-static <expr>` | Non-interactive inspection output |
 | `,slots <expr>` | Show slots of a class instance |
+
+The interactive inspector (`,i` or `,inspect`) provides a TUI for exploring objects:
+
+| Key | Action |
+|-----|--------|
+| `↑`/`↓` or `j`/`k` | Navigate entries |
+| `Enter` | Drill into selected entry |
+| `b` or `Backspace` | Go back to parent object |
+| `q` or `Escape` | Quit inspector |
 
 ### Macros
 
