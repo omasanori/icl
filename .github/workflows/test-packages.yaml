@@ -215,6 +215,7 @@ jobs:
         shell: powershell
         run: |
           dotnet tool install --global wix --version 5.0.2
+          wix extension add WixToolset.UI.wixext/5.0.2 -g
 
       - name: Build MSI installer
         shell: powershell
