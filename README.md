@@ -140,7 +140,6 @@ Commands are prefixed with a comma. Type `,help` for a full list.
 |---------|-------------|
 | `,bt` | Show backtrace from last error |
 | `,step <form>` | Show traced function calls during evaluation |
-| `,stack-trace` | Show current stack trace |
 | `,threads` | List all threads in inferior Lisp |
 | `,trace <function>` | Enable tracing |
 | `,untrace <function>` | Disable tracing |

@@ -955,30 +955,6 @@ Note: For full interactive stepping, connect to Slynk from SLY/SLIME."
      `(cl:eval (cl:read-from-string ,wrapper))
      *slynk-connection*)))
 
-(define-command (stack-trace stk) ()
-  "Show the current stack trace.
-Displays the call stack in the inferior Lisp.
-Example: ,stack-trace
-Example: ,stk"
-  (handler-case
-      (let ((result (slynk-stack-trace)))
-        (format t "~&~A~%" result))
-    (error (e)
-      (format *error-output* "~&Error: ~A~%" e))))
-
-(defun slynk-stack-trace ()
-  "Get current stack trace via Slynk."
-  (unless *slynk-connected-p*
-    (error "Not connected to Slynk server"))
-  (slynk-client:slime-eval
-   `(cl:eval (cl:read-from-string
-              "#+sbcl
-               (with-output-to-string (s)
-                 (sb-debug:print-backtrace :stream s :count 20))
-               #-sbcl
-               \"Stack trace only available on SBCL\""))
-   *slynk-connection*))
-
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; System Loading (trivial-system-loader style)
 ;;; ─────────────────────────────────────────────────────────────────────────────
