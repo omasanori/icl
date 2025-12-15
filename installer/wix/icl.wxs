@@ -56,6 +56,9 @@
       <Component Id="LicenseFile" Guid="B2C3D4E5-F6A7-8901-BCDE-F12345678901">
         <File Id="LICENSE" Source="$(SourceDir)\LICENSE" />
       </Component>
+      <Component Id="ThirdPartyLicenses" Guid="E5F6A7B8-C9D0-1234-EFAB-345678901234">
+        <File Id="THIRD_PARTY_LICENSES.txt" Source="$(SourceDir)\THIRD-PARTY-LICENSES.txt" />
+      </Component>
       <Component Id="ReadmeFile" Guid="C3D4E5F6-A7B8-9012-CDEF-123456789012">
         <File Id="README.md" Source="$(SourceDir)\README.md" />
       </Component>

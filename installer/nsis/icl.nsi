@@ -78,6 +78,7 @@ Section "ICL Core" SEC_CORE
 
   ; Install license and readme
   File "..\..\LICENSE"
+  File "..\..\THIRD-PARTY-LICENSES.txt"
   File "..\..\README.md"
 
   ; Store installation folder
@@ -147,6 +148,7 @@ Section "Uninstall"
   ; Remove files
   Delete "$INSTDIR\icl.exe"
   Delete "$INSTDIR\LICENSE"
+  Delete "$INSTDIR\THIRD-PARTY-LICENSES.txt"
   Delete "$INSTDIR\README.md"
   Delete "$INSTDIR\uninstall.exe"
 
