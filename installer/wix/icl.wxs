@@ -8,7 +8,8 @@
 
   Build with: wix build icl.wxs -o icl.msi -d VERSION=1.4.2
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
     Name="Interactive Common Lisp"
     Manufacturer="Anthony Green"
@@ -35,7 +36,7 @@
     </Feature>
 
     <!-- UI configuration - use minimal UI -->
-    <UIRef Id="WixUI_Minimal" />
+    <ui:WixUI Id="WixUI_Minimal" />
     <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
 
   </Package>
