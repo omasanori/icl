@@ -110,6 +110,12 @@
 (defvar *search-matches* nil
   "List of history indices matching the current pattern.")
 
+(defvar *prefix-search-prefix* nil
+  "The prefix for history-search-backward/forward (text before cursor when started).")
+
+(defvar *prefix-search-index* nil
+  "Current history index in prefix search.")
+
 (defvar *screen-row* 0
   "Current screen row relative to line 0 of the buffer.")
 
@@ -257,6 +263,60 @@
          (buffer-set-contents buf entry))
        t))))
 
+(defun reset-prefix-search ()
+  "Reset prefix search state."
+  (setf *prefix-search-prefix* nil
+        *prefix-search-index* nil))
+
+(defun history-search-backward (buf)
+  "Search backward for history entry starting with current line content.
+   On first call, saves the prefix. Subsequent calls find older matches."
+  (let ((current-content (buffer-contents buf)))
+    ;; Initialize search on first call or if content changed
+    (when (or (null *prefix-search-prefix*)
+              (not (and *prefix-search-index*
+                        (alexandria:starts-with-subseq *prefix-search-prefix* current-content))))
+      ;; Save current buffer if starting fresh
+      (unless *history-saved-buffer*
+        (setf *history-saved-buffer* current-content))
+      (setf *prefix-search-prefix* current-content
+            *prefix-search-index* -1))
+    ;; Search for next match
+    (let ((prefix (string-downcase *prefix-search-prefix*)))
+      (loop for i from (1+ *prefix-search-index*) below (length *editor-history*)
+            for entry = (nth i *editor-history*)
+            when (alexandria:starts-with-subseq prefix (string-downcase entry))
+            do (setf *prefix-search-index* i)
+               (buffer-set-contents buf entry)
+               (return t)
+            finally (return nil)))))
+
+(defun history-search-forward (buf)
+  "Search forward for history entry starting with the prefix.
+   Moves toward more recent entries."
+  (when (and *prefix-search-prefix* *prefix-search-index*)
+    (if (zerop *prefix-search-index*)
+        ;; Restore original input
+        (progn
+          (buffer-set-contents buf *history-saved-buffer*)
+          (reset-prefix-search)
+          (setf *history-saved-buffer* nil)
+          t)
+        ;; Search for previous (more recent) match
+        (let ((prefix (string-downcase *prefix-search-prefix*)))
+          (loop for i from (1- *prefix-search-index*) downto 0
+                for entry = (nth i *editor-history*)
+                when (alexandria:starts-with-subseq prefix (string-downcase entry))
+                do (setf *prefix-search-index* i)
+                   (buffer-set-contents buf entry)
+                   (return t)
+                finally
+                ;; No more matches - restore original
+                (buffer-set-contents buf *history-saved-buffer*)
+                (reset-prefix-search)
+                (setf *history-saved-buffer* nil)
+                (return t))))))
+
 (defun buffer-set-contents (buf string)
   "Set buffer contents from STRING, splitting on newlines."
   (let* ((lines (split-string-by-newline string))
@@ -295,6 +355,17 @@
   (unless *history-saved-buffer*
     (setf *history-saved-buffer* (buffer-contents buf))))
 
+(defun clear-search-display ()
+  "Clear the search display area and move cursor to start."
+  ;; Move up past the buffer lines to the search prompt line
+  (when (plusp *search-display-lines*)
+    (cursor-up *search-display-lines*))
+  (cursor-to-column 1)
+  ;; Clear the search prompt line and everything below
+  (clear-line)
+  (clear-below)
+  (setf *search-display-lines* 0))
+
 (defun exit-search-mode (buf accept)
   "Exit reverse-search mode.
    If ACCEPT is T, keep the current match in buffer."
@@ -302,11 +373,12 @@
     (let* ((hist-idx (nth *search-match-index* *search-matches*))
            (entry (nth hist-idx *editor-history*)))
       (buffer-set-contents buf entry)))
+  ;; Clear the search display before exiting
+  (clear-search-display)
   (setf *search-mode* nil
         *search-pattern* ""
         *search-match-index* 0
         *search-matches* nil
-        *search-display-lines* 0
         *history-saved-buffer* nil))
 
 (defun update-search (buf)
@@ -590,18 +662,21 @@
      (if (> (buffer-line-count buf) 1) :redraw :continue))
     ;; Deletion (with paredit support)
     ((eql key :backspace)
+     (reset-prefix-search)
      (if (if *paredit-mode*
              (paredit-backspace buf)
              (buffer-delete-char-before buf))
          :redraw
          :continue))
     ((eql key :delete)
+     (reset-prefix-search)
      (if (if *paredit-mode*
              (paredit-delete buf)
              (buffer-delete-char-at buf))
          :redraw
          :continue))
     ((eql key :kill-line)
+     (reset-prefix-search)
      (buffer-kill-line buf)
      :redraw)
     ((eql key :clear-line)
@@ -625,6 +700,14 @@
     ;; Alt+B - backward sexp (paredit)
     ((and (consp key) (eql (first key) :alt) (char-equal (rest key) #\b))
      (when (buffer-backward-sexp buf)
+       :redraw))
+    ;; Alt+P - history search backward (prefix match)
+    ((and (consp key) (eql (first key) :alt) (char-equal (rest key) #\p))
+     (when (history-search-backward buf)
+       :redraw))
+    ;; Alt+N - history search forward (prefix match)
+    ((and (consp key) (eql (first key) :alt) (char-equal (rest key) #\n))
+     (when (history-search-forward buf)
        :redraw))
     ;; Ctrl-R - enter reverse search mode
     ((eql key :reverse-search)
@@ -653,6 +736,8 @@
      :redraw)
     ;; Regular character (with paredit support)
     ((characterp key)
+     ;; Reset prefix search since buffer is being modified
+     (reset-prefix-search)
      (if (and *paredit-mode*
               (eql (paredit-handle-char buf key) :handled))
          ;; Paredit handled it

@@ -272,9 +272,11 @@ Use `configure-lisp` to customize how ICL invokes a Lisp implementation:
 | `Ctrl+L` | Clear screen |
 | `Ctrl+D` | EOF (exit if line empty) |
 | `Ctrl+C` | Cancel current input |
-| `Ctrl+R` | Reverse history search |
+| `Ctrl+R` | Reverse history search (substring match) |
 | `Ctrl+G` | Cancel search |
 | `Up/Down` | Navigate history (on first/last line) or move cursor |
+| `Alt+P` | History search backward (prefix match) |
+| `Alt+N` | History search forward (prefix match) |
 | `Alt+Q` | Reindent current form |
 | `Alt+F` | Forward sexp (paredit mode only) |
 | `Alt+B` | Backward sexp (paredit mode only) |
