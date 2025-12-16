@@ -76,15 +76,13 @@
   (declare (ignore package))
   (unless *slynk-connected-p*
     (error "Not connected to backend server"))
-  ;; Use with-output-to-string for portable output capture across all backends
-  ;; This captures output rather than streaming it, but works reliably on all Lisps
+  ;; Don't redirect output streams - let output go to the inferior process's stdout
+  ;; which is picked up by the output reader thread. This ensures libraries like llog
+  ;; that capture *standard-output* at initialization time continue to work.
   (let ((wrapper-code (format nil "(handler-case
-  (let* ((output (make-array 0 :element-type 'character :adjustable t :fill-pointer 0))
-         (vals (with-output-to-string (*standard-output* output)
-                 (let ((*error-output* *standard-output*)
-                       (*trace-output* *standard-output*))
-                   (multiple-value-list (eval (read-from-string ~S)))))))
-    (list :ok output (mapcar (lambda (v) (write-to-string v :readably nil :pretty nil)) vals)))
+  (let ((vals (multiple-value-list (eval (read-from-string ~S)))))
+    (force-output)
+    (list :ok nil (mapcar (lambda (v) (write-to-string v :readably nil :pretty nil)) vals)))
   (error (err)
     (list :error
           ;; Clean error message: strip Stream: lines from reader errors

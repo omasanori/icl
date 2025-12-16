@@ -17,6 +17,9 @@
 (defvar *inferior-process* nil
   "The inferior Lisp process.")
 
+(defvar *output-reader-thread* nil
+  "Background thread that reads output from the inferior Lisp process.")
+
 (defvar *lisp-implementations*
   '((:sbcl :program "sbcl" :args ("--noinform") :eval-arg "--eval")
     (:ccl :program "ccl" :args nil :eval-arg "--eval")
@@ -310,6 +313,42 @@
           return port
         finally (error "Could not find a free port after ~D attempts" max-attempts)))
 
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Output Reader Thread
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defun start-output-reader ()
+  "Start background thread to read and display inferior Lisp output."
+  #+sbcl
+  (when (and *inferior-process* (not *output-reader-thread*))
+    (let ((stream (sb-ext:process-output *inferior-process*)))
+      (when stream
+        (setf *output-reader-thread*
+              (sb-thread:make-thread
+               (lambda ()
+                 (unwind-protect
+                      (loop
+                        (handler-case
+                            (let ((char (read-char stream nil :eof)))
+                              (when (eq char :eof)
+                                (return))
+                              (write-char char)
+                              ;; Flush on newlines for responsive output
+                              (when (char= char #\Newline)
+                                (force-output)))
+                          (error () (return))))
+                   ;; Cleanup
+                   (setf *output-reader-thread* nil)))
+               :name "icl-output-reader"))))))
+
+(defun stop-output-reader ()
+  "Stop the output reader thread."
+  #+sbcl
+  (when *output-reader-thread*
+    (ignore-errors
+      (sb-thread:terminate-thread *output-reader-thread*))
+    (setf *output-reader-thread* nil)))
+
 (defun start-inferior-lisp (&key (lisp *default-lisp*) (port nil))
   "Start an inferior Lisp process with Slynk.
    If PORT is NIL, automatically finds a free port.
@@ -378,6 +417,8 @@
                      (zerop (mod ticks 5)))
             (when (slynk-connect :port actual-port)
               (clear-spinner)
+              ;; Start background thread to stream inferior Lisp output
+              (start-output-reader)
               (return t)))
           (when (>= ticks max-ticks)
             (clear-spinner)
@@ -394,6 +435,8 @@
 (defun stop-inferior-lisp ()
   "Stop the inferior Lisp process."
   (when *inferior-process*
+    ;; Stop the output reader thread first
+    (stop-output-reader)
     ;; Just disconnect - the process will be killed below if needed
     (slynk-disconnect)
     ;; Give it a moment
