@@ -64,7 +64,7 @@ trivial-gray-streams-test, ghcr.io/ocicl/trivial-gray-streams@sha256:d0cc9fb7387
 trivial-macroexpand-all, ghcr.io/ocicl/trivial-macroexpand-all@sha256:b23da4c2e508efe2396ec8f721cb22b8a4c076b2f0aea014a09f69dfd716d7f8, trivial-macroexpand-all-20250518-b6e4efa/trivial-macroexpand-all.asd
 trivial-timeout, ghcr.io/ocicl/trivial-timeout@sha256:18f5f87e1fa3a35e5608cd424d22c2b24f581f810d9f9f8c6229b849c2f239ad, trivial-timeout-20240503-e70d9b4/trivial-timeout.asd
 trivial-timeout-test, ghcr.io/ocicl/trivial-timeout@sha256:18f5f87e1fa3a35e5608cd424d22c2b24f581f810d9f9f8c6229b849c2f239ad, trivial-timeout-20240503-e70d9b4/trivial-timeout-test.asd
-tuition, ghcr.io/ocicl/tuition@sha256:493e5f0dc2b5d110745dc56b0967e0a311231cd206c2cb6b387c86aa738aebe8, cl-tuition-20251216-720b5fb/tuition.asd
+tuition, ghcr.io/ocicl/tuition@sha256:6f6c654cf746fcafe39ba32356ac8767455fd9939a59a15a03bbbd03c139ed44, cl-tuition-20251216-d0b37d1/tuition.asd
 type-i, ghcr.io/ocicl/type-i@sha256:de5c3e7f7b72409c5ec49885eea8c6fe2e02def2846cf97f70c1c21f21a1567c, type-i-20240503-4407a68/type-i.asd
 type-i.test, ghcr.io/ocicl/type-i@sha256:de5c3e7f7b72409c5ec49885eea8c6fe2e02def2846cf97f70c1c21f21a1567c, type-i-20240503-4407a68/type-i.test.asd
 uffi, ghcr.io/ocicl/cffi-grovel@sha256:0854274d437e36f8bd30549103de36d23ac22f481f2746e61785e883f52b25fa, cffi-20250822-dad3520/uffi-compat/uffi.asd
