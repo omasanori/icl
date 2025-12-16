@@ -49,11 +49,17 @@
       (setf *saved-termios* nil)
       (return-from enter-raw-mode nil)))
   (setf *terminal-raw-p* t)
+  ;; Enable bracketed paste mode
+  (format t "~C[?2004h" +esc+)
+  (force-output)
   t)
 
 (defun exit-raw-mode ()
   "Restore terminal to original settings."
   (when (and *terminal-raw-p* *saved-termios*)
+    ;; Disable bracketed paste mode
+    (format t "~C[?2004l" +esc+)
+    (force-output)
     (osicat-posix:tcsetattr 0 osicat-posix:tcsanow *saved-termios*)
     (cffi:foreign-free *saved-termios*)
     (setf *saved-termios* nil
@@ -310,8 +316,53 @@
          (4 :end)
          (5 :page-up)
          (6 :page-down)
+         (200 (read-bracketed-paste))  ; Bracketed paste start
+         (201 :paste-end)              ; Shouldn't see this alone
          (otherwise :unknown)))
       (t :unknown))))
+
+(defun read-bracketed-paste ()
+  "Read pasted text until ESC[201~ (paste end).
+   Returns a cons of (:paste . string)."
+  (let ((chars nil))
+    (loop
+      (let ((c (read-char-raw)))
+        (unless c
+          ;; EOF during paste - return what we have
+          (return (cons :paste (coerce (nreverse chars) 'string))))
+        (cond
+          ;; Check for ESC - might be end of paste
+          ((char= c +esc+)
+           (let ((next (read-char-raw)))
+             (cond
+               ((null next)
+                (push c chars)
+                (return (cons :paste (coerce (nreverse chars) 'string))))
+               ((char= next #\[)
+                ;; Could be ESC[201~ - check for 201~
+                (let ((num 0)
+                      (nc nil))
+                  (loop do (setf nc (read-char-raw))
+                        while (and nc (digit-char-p nc))
+                        do (setf num (+ (* num 10) (- (char-code nc) (char-code #\0)))))
+                  (if (and nc (char= nc #\~) (= num 201))
+                      ;; End of paste
+                      (return (cons :paste (coerce (nreverse chars) 'string)))
+                      ;; Not end of paste - push the escape sequence chars
+                      (progn
+                        (push c chars)
+                        (push next chars)
+                        ;; Push digits
+                        (let ((num-str (format nil "~D" num)))
+                          (dotimes (i (length num-str))
+                            (push (char num-str i) chars)))
+                        (when nc (push nc chars))))))
+               (t
+                ;; Not CSI, push both chars
+                (push c chars)
+                (push next chars)))))
+          (t
+           (push c chars)))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Terminal Color Detection

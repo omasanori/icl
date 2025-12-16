@@ -587,6 +587,27 @@
     ((eql key :reverse-search)
      (enter-search-mode buf)
      :search-mode)
+    ;; Bracketed paste - insert entire string at once
+    ((and (consp key) (eql (car key) :paste))
+     (let ((text (cdr key)))
+       (dotimes (i (length text))
+         (let ((c (char text i)))
+           (cond
+             ;; Convert CR or CRLF to newline
+             ((char= c #\Return)
+              ;; Skip if followed by LF
+              (unless (and (< (1+ i) (length text))
+                           (char= (char text (1+ i)) #\Newline))
+                (buffer-insert-newline buf)))
+             ((char= c #\Newline)
+              (buffer-insert-newline buf))
+             ;; Regular character
+             (t
+              (if (and *paredit-mode*
+                       (eql (paredit-handle-char buf c) :handled))
+                  nil  ; Paredit handled it
+                  (buffer-insert-char buf c)))))))
+     :redraw)
     ;; Regular character (with paredit support)
     ((characterp key)
      (if (and *paredit-mode*
