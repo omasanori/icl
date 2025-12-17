@@ -182,7 +182,11 @@ Optional filter: functions, macros, variables, classes, all, external, internal"
   (format t "  Package:        ~A~%" *icl-package-name*)
   (format t "  History file:   ~A~%" (history-file))
   (format t "  Input count:    ~A~%" *input-count*)
-  (format t "  Terminal:       ~A~%" (if (terminal-capable-p) "capable" "dumb")))
+  (format t "  Terminal:       ~A~%" (if (terminal-capable-p) "capable" "dumb"))
+  (format t "  MCP server:     ~A~%"
+          (if (mcp-http-server-running-p)
+              (format nil "running on port ~D" *mcp-http-port*)
+              "not running")))
 
 (define-command (lisp backend) (&optional lisp-name)
   "Show or change the current Lisp backend.
@@ -562,6 +566,94 @@ Example: ,source my-function"
         (t
          (format t "  ~S~%" loc-data))))))
 
+(defun byte-offset-to-line (file offset)
+  "Convert byte OFFSET to line number in FILE.
+Returns 1 if file cannot be read or offset is invalid."
+  (handler-case
+      (with-open-file (s file :element-type '(unsigned-byte 8))
+        (loop with line-num = 1
+              for byte-pos from 0 below offset
+              for byte = (read-byte s nil nil)
+              while byte
+              when (= byte 10)  ; newline
+              do (incf line-num)
+              finally (return line-num)))
+    (error () 1)))
+
+(defun default-editor ()
+  "Return the default editor command for the current platform."
+  (or (uiop:getenv "EDITOR")
+      (uiop:getenv "VISUAL")
+      #+windows "notepad"
+      #+darwin "open"
+      #-(or windows darwin) "vi"))
+
+(defun editor-open-command (editor file line)
+  "Return the command list to open FILE at LINE in EDITOR."
+  (let ((editor-name (pathname-name (pathname editor))))
+    (cond
+      ;; macOS open command - use -t for text editor
+      ((string-equal editor "open")
+       (list "open" "-t" file))
+      ;; Windows notepad doesn't support line numbers
+      ((string-equal editor-name "notepad")
+       (list editor file))
+      ;; VS Code
+      ((or (string-equal editor-name "code")
+           (string-equal editor-name "code-insiders"))
+       (list editor "--goto" (format nil "~A:~D" file line)))
+      ;; Most editors support +LINE syntax (vim, emacs, nano, micro, etc.)
+      (t
+       (list editor (format nil "+~D" line) file)))))
+
+(define-command (edit ed) (symbol-name)
+  "Open the source file for a symbol in $EDITOR.
+Uses $EDITOR or $VISUAL environment variable, or platform default.
+Example: ,edit my-function"
+  (handler-case
+      (let ((locations (slynk-find-definitions symbol-name)))
+        (if locations
+            ;; Use the first location (usually the main definition)
+            (let* ((loc (first locations))
+                   (loc-data (second loc)))
+              (multiple-value-bind (file pos)
+                  (extract-file-and-position loc-data)
+                (if file
+                    (if (probe-file file)
+                        (let* ((line (if pos (byte-offset-to-line file pos) 1))
+                               (editor (default-editor))
+                               (cmd (editor-open-command editor file line)))
+                          (format t "~&Opening ~A at line ~D...~%" file line)
+                          (force-output)
+                          ;; Use :interactive to connect editor to terminal
+                          (uiop:run-program cmd
+                                            :input :interactive
+                                            :output :interactive
+                                            :ignore-error-status t))
+                        (format *error-output* "~&File not found: ~A~%" file))
+                    (format *error-output* "~&No file location for: ~A~%" symbol-name))))
+            (format *error-output* "~&No source location found for: ~A~%" symbol-name)))
+    (error (e)
+      (format *error-output* "~&Error: ~A~%" e))))
+
+(defun extract-file-and-position (loc-data)
+  "Extract file path and position from Slynk location data.
+Returns (VALUES file position) or (VALUES NIL NIL)."
+  (cond
+    ;; (:location (:file ...) (:position ...))
+    ((and (listp loc-data) (eq (first loc-data) :location))
+     (let* ((props (rest loc-data))
+            (file (second (assoc :file props)))
+            (pos (second (assoc :position props))))
+       (values file pos)))
+    ;; ((:file ...) (:position ...)) - direct alist
+    ((and (listp loc-data) (listp (first loc-data)) (eq (first (first loc-data)) :file))
+     (let ((file (second (assoc :file loc-data)))
+           (pos (second (assoc :position loc-data))))
+       (values file pos)))
+    (t
+     (values nil nil))))
+
 (defun show-source-location (sym)
   "Show source location for symbol SYM (local/SBCL)."
   #+sbcl
@@ -597,20 +689,32 @@ Example: ,source my-function"
 (define-command (trace tr) (symbol-name)
   "Enable tracing for a function.
 Example: ,trace my-function"
-  (handler-case
-      (let ((result (slynk-toggle-trace symbol-name)))
-        (format t "~&~A~%" result))
-    (error (e)
-      (format *error-output* "~&Error: ~A~%" e))))
+  (let ((trimmed (string-trim '(#\Space #\Tab) symbol-name)))
+    (if (and (> (length trimmed) 0) (char= (char trimmed 0) #\())
+        (progn
+          (format *error-output* "~&Error: ,trace expects a symbol name, not a form.~%")
+          (format *error-output* "~&Usage: ,trace ~A~%"
+                  (string-trim '(#\( #\) #\Space) trimmed)))
+        (handler-case
+            (let ((result (slynk-toggle-trace symbol-name)))
+              (format t "~&~A~%" result))
+          (error (e)
+            (format *error-output* "~&Error: ~A~%" e))))))
 
 (define-command (untrace untr) (symbol-name)
   "Disable tracing for a function.
 Example: ,untrace my-function"
-  (handler-case
-      (let ((result (slynk-untrace symbol-name)))
-        (format t "~&~A~%" result))
-    (error (e)
-      (format *error-output* "~&Error: ~A~%" e))))
+  (let ((trimmed (string-trim '(#\Space #\Tab) symbol-name)))
+    (if (and (> (length trimmed) 0) (char= (char trimmed 0) #\())
+        (progn
+          (format *error-output* "~&Error: ,untrace expects a symbol name, not a form.~%")
+          (format *error-output* "~&Usage: ,untrace ~A~%"
+                  (string-trim '(#\( #\) #\Space) trimmed)))
+        (handler-case
+            (let ((result (slynk-untrace symbol-name)))
+              (format t "~&~A~%" result))
+          (error (e)
+            (format *error-output* "~&Error: ~A~%" e))))))
 
 (define-command (untrace-all untr-all) ()
   "Disable all tracing.
@@ -626,16 +730,19 @@ Example: ,untrace-all"
   (unless *slynk-connected-p*
     (error "Not connected to Slynk server"))
   (slynk-client:slime-eval
-   `(cl:funcall (cl:read-from-string "slynk:toggle-trace-fdefinition") ,name)
+   `(cl:funcall (cl:read-from-string "slynk:slynk-toggle-trace") ,name)
    *slynk-connection*))
 
 (defun slynk-untrace (name)
   "Untrace NAME via Slynk."
   (unless *slynk-connected-p*
     (error "Not connected to Slynk server"))
-  (slynk-client:slime-eval
-   `(cl:untrace ,(read-from-string (string-upcase name)))
-   *slynk-connection*))
+  ;; Use read-from-string in remote Lisp to handle symbols from remote-only packages
+  (let ((code (format nil "(cl:untrace ~A)" (string-upcase name))))
+    (slynk-client:slime-eval
+     `(cl:eval (cl:read-from-string ,code))
+     *slynk-connection*))
+  (format nil "~A is now untraced." name))
 
 (defun slynk-untrace-all ()
   "Untrace all functions via Slynk."
@@ -759,13 +866,12 @@ Example: ,load /path/to/file.lisp"
         name)))
 
 (defun slynk-load-file (filename)
-  "Load FILENAME via Slynk."
+  "Load FILENAME via Slynk with streaming output."
   (unless *slynk-connected-p*
     (error "Not connected to Slynk server"))
   (let ((namestring (namestring (truename filename))))
-    (slynk-client:slime-eval
-     `(cl:load ,namestring)
-     *slynk-connection*)
+    ;; Use backend-eval for streaming output support
+    (backend-eval (format nil "(cl:load ~S)" namestring))
     (format nil "Loaded ~A" namestring)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
@@ -783,13 +889,12 @@ Example: ,compile-file myfile.lisp"
       (format *error-output* "~&Error compiling file: ~A~%" e))))
 
 (defun slynk-compile-file (filename)
-  "Compile FILENAME via Slynk."
+  "Compile FILENAME via Slynk with streaming output."
   (unless *slynk-connected-p*
     (error "Not connected to Slynk server"))
   (let ((namestring (namestring (truename filename))))
-    (slynk-client:slime-eval
-     `(cl:compile-file ,namestring)
-     *slynk-connection*)
+    ;; Use backend-eval for streaming output support
+    (backend-eval (format nil "(cl:compile-file ~S)" namestring))
     (format nil "Compiled ~A" namestring)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
@@ -1014,8 +1119,7 @@ Tries in order: ocicl (with download), Quicklisp, plain ASDF.
 Example: ,load-system alexandria
 Example: ,ql cl-ppcre"
   (handler-case
-      (let ((result (slynk-load-system system-name)))
-        (format t "~&~A~%" result))
+      (slynk-load-system system-name)
     (error (e)
       (format *error-output* "~&Error loading system: ~A~%" e))))
 
@@ -1026,6 +1130,7 @@ Example: ,ql cl-ppcre"
     (error "Not connected to Slynk server"))
   (let* ((name (string-trim '(#\Space #\Tab #\") system-name))
          ;; Code that tries ocicl, then Quicklisp, then ASDF
+         ;; Prints result directly to avoid quote issues with returned strings
          (loader-code (format nil "
 (flet ((try-load ()
          (let ((system '~A))
@@ -1036,19 +1141,21 @@ Example: ,ql cl-ppcre"
                            (find-symbol \"*VERBOSE*\" '#:OCICL-RUNTIME))
                   (list t nil)
                 (asdf:load-system system))
-              (format nil \"Loaded ~~A via ocicl\" system))
+              (format t \"~~&Loaded ~~A via ocicl~~%%\" system))
              ;; Try Quicklisp
              ((find-package '#:QUICKLISP)
               (funcall (find-symbol \"QUICKLOAD\" '#:QUICKLISP) system :silent nil)
-              (format nil \"Loaded ~~A via Quicklisp\" system))
+              (format t \"~~&Loaded ~~A via Quicklisp~~%%\" system))
              ;; Fall back to plain ASDF
              ((find-package '#:ASDF)
               (asdf:load-system system)
-              (format nil \"Loaded ~~A via ASDF\" system))
+              (format t \"~~&Loaded ~~A via ASDF~~%%\" system))
              (t
               (error \"No system loader available (ocicl, Quicklisp, or ASDF)\"))))))
-  (try-load))" name)))
-    (first (backend-eval loader-code))))
+  (try-load)
+  (values))" name)))
+    (backend-eval loader-code)
+    nil))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Configuration Commands
@@ -1196,12 +1303,11 @@ Example: ,paredit        ; toggle
   (force-output))
 
 (defun setup-gemini-mcp-config ()
-  "Create temporary Gemini MCP config for ICL tools. Returns config file path."
+  "Create temporary Gemini MCP config for ICL tools. Returns config file path.
+   Uses Streamable HTTP transport if MCP server is running, otherwise falls back to stdio."
   (let* ((gemini-dir (merge-pathnames ".gemini/" (uiop:getcwd)))
          (config-file (merge-pathnames "settings.json" gemini-dir))
-         (icl-path (or (uiop:argv0)
-                       (namestring (merge-pathnames "icl" (uiop:getcwd)))))
-         (slynk-addr (format nil "~A:~D" *slynk-host* *slynk-port*)))
+         (use-http (mcp-http-server-running-p)))
     ;; Ensure .gemini directory exists
     (ensure-directories-exist config-file)
     ;; Write MCP config
@@ -1209,8 +1315,15 @@ Example: ,paredit        ; toggle
       (format out "{~%")
       (format out "  \"mcpServers\": {~%")
       (format out "    \"icl\": {~%")
-      (format out "      \"command\": ~S,~%" icl-path)
-      (format out "      \"args\": [\"--mcp-server\", ~S],~%" slynk-addr)
+      (if use-http
+          ;; Streamable HTTP transport - use httpUrl (not url which is SSE)
+          (format out "      \"httpUrl\": ~S,~%" (mcp-http-server-url))
+          ;; Stdio transport - spawns a subprocess
+          (let ((icl-path (or (uiop:argv0)
+                              (namestring (merge-pathnames "icl" (uiop:getcwd)))))
+                (slynk-addr (format nil "~A:~D" *slynk-host* *slynk-port*)))
+            (format out "      \"command\": ~S,~%" icl-path)
+            (format out "      \"args\": [\"--mcp-server\", ~S],~%" slynk-addr)))
       (format out "      \"timeout\": 30000,~%")
       (format out "      \"trust\": true~%")
       (format out "    }~%")
@@ -1228,19 +1341,26 @@ Example: ,paredit        ; toggle
       (uiop:delete-empty-directory (merge-pathnames ".gemini/" (uiop:getcwd))))))
 
 (defun setup-claude-mcp-config ()
-  "Create temporary Claude MCP config for ICL tools. Returns config file path."
+  "Create temporary Claude MCP config for ICL tools. Returns config file path.
+   Uses Streamable HTTP transport if MCP server is running, otherwise falls back to stdio."
   (let* ((config-file (merge-pathnames ".mcp.json" (uiop:getcwd)))
-         (icl-path (or (uiop:argv0)
-                       (namestring (merge-pathnames "icl" (uiop:getcwd)))))
-         (slynk-addr (format nil "~A:~D" *slynk-host* *slynk-port*)))
-    ;; Write MCP config (Claude Code requires "type": "stdio" for local servers)
+         (use-http (mcp-http-server-running-p)))
     (with-open-file (out config-file :direction :output :if-exists :supersede)
       (format out "{~%")
       (format out "  \"mcpServers\": {~%")
       (format out "    \"icl\": {~%")
-      (format out "      \"type\": \"stdio\",~%")
-      (format out "      \"command\": ~S,~%" icl-path)
-      (format out "      \"args\": [\"--mcp-server\", ~S]~%" slynk-addr)
+      (if use-http
+          ;; Streamable HTTP transport - requires type and url
+          (progn
+            (format out "      \"type\": \"http\",~%")
+            (format out "      \"url\": ~S~%" (mcp-http-server-url)))
+          ;; Stdio transport - spawns a subprocess
+          (let ((icl-path (or (uiop:argv0)
+                              (namestring (merge-pathnames "icl" (uiop:getcwd)))))
+                (slynk-addr (format nil "~A:~D" *slynk-host* *slynk-port*)))
+            (format out "      \"type\": \"stdio\",~%")
+            (format out "      \"command\": ~S,~%" icl-path)
+            (format out "      \"args\": [\"--mcp-server\", ~S]~%" slynk-addr)))
       (format out "    }~%")
       (format out "  }~%")
       (format out "}~%"))
@@ -1255,26 +1375,42 @@ Example: ,paredit        ; toggle
 (defun run-ai-cli (cli prompt)
   "Run an AI CLI with the given prompt, streaming output with markdown rendering."
   (let* ((program (ai-cli-program cli))
-         (use-mcp (and (member cli '(:gemini :claude)) *slynk-connected-p*))
-         (args (ecase cli
-                 (:claude (if use-mcp
-                              ;; Use --mcp-config to load our MCP server in -p mode
-                              (list program "-p" prompt "--mcp-config" ".mcp.json")
-                              (list program "-p" prompt)))
-                 (:gemini (list program "-p" prompt))
-                 (:codex (list program "-p" prompt)))))
-    ;; Setup MCP config if connected to Slynk
+         (use-mcp (and (member cli '(:gemini :claude :codex)) *slynk-connected-p*)))
+    ;; Start HTTP MCP server on-demand for AI integration
     (when use-mcp
-      (ecase cli
-        (:gemini (setup-gemini-mcp-config))
-        (:claude (setup-claude-mcp-config))))
-    (unwind-protect
-        (run-ai-cli-streaming program args)
-      ;; Cleanup
+      (start-mcp-http-server))
+    (let ((args (ecase cli
+                  (:claude (if use-mcp
+                               ;; Use --mcp-config to load our MCP server in -p mode
+                               ;; Pre-allow all ICL tools to avoid permission prompts
+                               (list program "-p" prompt
+                                     "--mcp-config" ".mcp.json"
+                                     "--allowedTools" "mcp__icl__*")
+                               (list program "-p" prompt)))
+                  (:gemini (list program "-p" prompt))
+                  (:codex (if use-mcp
+                              ;; Use exec subcommand for non-interactive mode
+                              ;; --enable rmcp_client required for HTTP transport
+                              ;; --skip-git-repo-check allows running outside git repos
+                              (list program "exec" prompt
+                                    "--skip-git-repo-check"
+                                    "--enable" "rmcp_client"
+                                    "--config" (format nil "mcp_servers.icl.url=~S"
+                                                       (mcp-http-server-url)))
+                              (list program "exec" prompt "--skip-git-repo-check"))))))
+      ;; Setup MCP config file if needed (gemini/claude use config files)
       (when use-mcp
-        (ecase cli
-          (:gemini (cleanup-gemini-mcp-config))
-          (:claude (cleanup-claude-mcp-config)))))))
+        (case cli
+          (:gemini (setup-gemini-mcp-config))
+          (:claude (setup-claude-mcp-config))))
+      (unwind-protect
+          (run-ai-cli-streaming program args)
+        ;; Cleanup
+        (when use-mcp
+          (case cli
+            (:gemini (cleanup-gemini-mcp-config))
+            (:claude (cleanup-claude-mcp-config)))
+          (stop-mcp-http-server))))))
 
 (defun run-ai-cli-streaming (program args)
   "Run AI CLI, buffering output and rendering as markdown at the end.
@@ -1397,8 +1533,8 @@ Examples:
                (last-form icl-+)
                (last-result icl-*)
                (input (string-trim '(#\Space #\Tab) (format nil "~{~A~^ ~}" args)))
-               ;; Include MCP tools info for gemini and claude
-               (context (get-system-context :with-mcp-tools (member cli '(:gemini :claude))))
+               ;; Include MCP tools info for CLIs that support MCP
+               (context (get-system-context :with-mcp-tools (member cli '(:gemini :claude :codex))))
                (prompt
                  (cond
                    ;; No args - explain based on what happened last
@@ -1422,6 +1558,10 @@ Examples:
                                error-condition
                                error-backtrace))
                       ;; Otherwise explain last expression and result
+                      ;; But skip if there's nothing meaningful to explain
+                      ((and (null last-form) (null last-result))
+                       (format t "~&Nothing to explain. Try evaluating an expression first.~%")
+                       nil)
                       (t
                        (format nil "~A~%~%Explain this Common Lisp expression and its result:~%~%Expression: ~S~%~%Result: ~A"
                                context

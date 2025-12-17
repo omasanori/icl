@@ -63,6 +63,15 @@
   ;; Increment input count
   (incf *input-count*))
 
+(defun record-repl-interaction (input result &optional error-p)
+  "Record a REPL interaction in *repl-history* for MCP access.
+   INPUT is the string input, RESULT is the result string (or error message).
+   ERROR-P is T if this was an error."
+  (push (list input result error-p) *repl-history*)
+  ;; Trim to max size
+  (when (> (length *repl-history*) *repl-history-max*)
+    (setf *repl-history* (subseq *repl-history* 0 *repl-history-max*))))
+
 (defun eval-and-print (input)
   "Parse, evaluate, and print results from INPUT string.
    Handles all errors gracefully. Uses Slynk backend for evaluation."
@@ -84,6 +93,13 @@
               (update-result-history form values))
             (when form
               (run-after-eval-hooks form values)))
+          ;; Record for MCP history access
+          (let ((result-str (cond
+                              ((null result) "")
+                              ((stringp result) result)
+                              ((listp result) (format nil "~{~S~^, ~}" result))
+                              (t (format nil "~S" result)))))
+            (record-repl-interaction input result-str nil))
           ;; Handle the result for display
           (cond
             ((null result)
@@ -102,11 +118,13 @@
              ;; Unexpected result type - print as-is
              (format t "~&~A~S~%" (colorize *result-prefix* *color-prefix*) result))))
       (undefined-function (e)
-        (format *error-output* "~&Undefined function: ~A~%"
-                (cell-error-name e)))
+        (let ((msg (format nil "Undefined function: ~A" (cell-error-name e))))
+          (record-repl-interaction input msg t)
+          (format *error-output* "~&~A~%" msg)))
       (unbound-variable (e)
-        (format *error-output* "~&Unbound variable: ~A~%"
-                (cell-error-name e)))
+        (let ((msg (format nil "Unbound variable: ~A" (cell-error-name e))))
+          (record-repl-interaction input msg t)
+          (format *error-output* "~&~A~%" msg)))
       (error (e)
         ;; Give the process a moment to die (quit may be async)
         (sleep 0.1)
@@ -114,6 +132,8 @@
         (unless (and *slynk-connected-p* (inferior-lisp-alive-p))
           (setf *slynk-connected-p* nil)
           (invoke-restart 'quit))
+        ;; Record error for MCP
+        (record-repl-interaction input (format nil "Error: ~A" e) t)
         ;; Print the error for other cases
         (format *error-output* "~&Error: ~A~%" e)
         ;; Hint about backtrace if available

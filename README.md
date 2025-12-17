@@ -103,6 +103,7 @@ Commands are prefixed with a comma. Type `,help` for a full list.
 | `,apropos <pattern>` | Search for matching symbols |
 | `,arglist <function>` | Show function arguments |
 | `,source <symbol>` | Show source location |
+| `,edit <symbol>` | Open source in `$EDITOR` (alias: `,ed`) |
 
 ### Inspection
 
@@ -280,7 +281,7 @@ Use `configure-lisp` to customize how ICL invokes a Lisp implementation:
 | `Ctrl+K` | Kill to end of line |
 | `Ctrl+U` | Clear entire line |
 | `Ctrl+L` | Clear screen |
-| `Ctrl+D` | EOF (exit if line empty) |
+| `Ctrl+D` | Delete character at cursor, or EOF if line empty (Emacs-style) |
 | `Ctrl+C` | Cancel current input |
 | `Ctrl+R` | Reverse history search (substring match) |
 | `Ctrl+G` | Cancel search |

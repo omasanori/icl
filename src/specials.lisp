@@ -186,6 +186,17 @@
   "T if the last REPL action resulted in an error.")
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Extended REPL History (for MCP access)
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defvar *repl-history* nil
+  "List of recent REPL interactions: ((input result error-p) ...).
+   Most recent first. Used by MCP server for get_repl_history tool.")
+
+(defvar *repl-history-max* 50
+  "Maximum number of REPL interactions to keep in *repl-history*.")
+
+;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; AI CLI Configuration
 ;;; ─────────────────────────────────────────────────────────────────────────────
 

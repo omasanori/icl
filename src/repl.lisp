@@ -34,6 +34,8 @@
              (return-from repl-loop))))
     ;; Cleanup on exit
     (save-history)
+    ;; Stop HTTP MCP server if running
+    (stop-mcp-http-server)
     ;; Stop inferior Lisp if running
     (when (inferior-lisp-alive-p)
       (stop-inferior-lisp))))

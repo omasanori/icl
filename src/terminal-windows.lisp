@@ -349,7 +349,7 @@
       ((char= c (code-char 8)) :backspace) ; Backspace (8)
       ((char= c (code-char 13)) :enter)    ; CR
       ((char= c (code-char 10)) :enter)    ; LF
-      ((char= c (code-char 4)) :eof)       ; Ctrl-D
+      ((char= c (code-char 4)) :ctrl-d)    ; Ctrl-D (delete char or EOF)
       ((char= c (code-char 1)) :home)      ; Ctrl-A
       ((char= c (code-char 5)) :end)       ; Ctrl-E
       ((char= c (code-char 11)) :kill-line) ; Ctrl-K

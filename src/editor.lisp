@@ -675,6 +675,16 @@
              (buffer-delete-char-at buf))
          :redraw
          :continue))
+    ;; Ctrl-D: delete char at cursor, or EOF if buffer empty (Emacs behavior)
+    ((eql key :ctrl-d)
+     (reset-prefix-search)
+     (if (buffer-empty-p buf)
+         :eof
+         (if (if *paredit-mode*
+                 (paredit-delete buf)
+                 (buffer-delete-char-at buf))
+             :redraw
+             :continue)))
     ((eql key :kill-line)
      (reset-prefix-search)
      (buffer-kill-line buf)

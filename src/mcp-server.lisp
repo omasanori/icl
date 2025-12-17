@@ -91,7 +91,19 @@
      (("path" "string" "Relative path within ocicl directory (e.g., alexandria-20240101/alexandria.lisp)" t)))
     ("list_source_files"
      "List Lisp source files in the ocicl directory, optionally filtered by pattern"
-     (("pattern" "string" "Optional glob pattern to filter (e.g., alexandria* or *.asd)" nil))))
+     (("pattern" "string" "Optional glob pattern to filter (e.g., alexandria* or *.asd)" nil)))
+    ("get_repl_history"
+     "Get recent REPL interactions (input expressions and their results)"
+     (("count" "integer" "Number of recent interactions to return (default: 10, max: 50)" nil)))
+    ("list_project_files"
+     "List files in the current working directory, optionally filtered by pattern"
+     (("pattern" "string" "Optional glob pattern (e.g., *.lisp, src/**/*.lisp)" nil)))
+    ("read_project_file"
+     "Read a file from the current working directory"
+     (("path" "string" "Relative path within project directory" t)))
+    ("get_session_info"
+     "Get current ICL session information (package, backend, recent values)"
+     ()))
   "List of MCP tools: (name description ((arg-name type description required)...).
    NOTE: No eval tool - we only provide read-only inspection for security.")
 
@@ -267,6 +279,80 @@
             (format nil "No .lisp files matching '~A' found in ocicl/" pattern)
             "No .lisp files found in ocicl/"))))
 
+(defun mcp-get-repl-history (&optional count)
+  "Get recent REPL history. COUNT defaults to 10, max 50."
+  (let* ((n (min (or count 10) 50))
+         (history (subseq *repl-history* 0 (min n (length *repl-history*)))))
+    (if history
+        (with-output-to-string (s)
+          (format s "Recent REPL interactions (newest first):~%~%")
+          (loop for (input result error-p) in history
+                for i from 1
+                do (format s "~D. Input: ~A~%   ~A~A~%~%"
+                           i input
+                           (if error-p "Error: " "Result: ")
+                           result)))
+        "No REPL history available yet.")))
+
+(defun safe-project-path-p (path)
+  "Check if PATH is safe (no .., absolute paths, or parent traversal)."
+  (and (stringp path)
+       (> (length path) 0)
+       (not (search ".." path))
+       (not (char= (char path 0) #\/))
+       (not (char= (char path 0) #\~))))
+
+(defun mcp-list-project-files (pattern)
+  "List files in current directory matching PATTERN."
+  (let* ((cwd (uiop:getcwd))
+         (glob-pattern (if (and pattern (> (length pattern) 0))
+                           pattern
+                           "*"))
+         (files (handler-case
+                    (directory (merge-pathnames glob-pattern cwd))
+                  (error () nil))))
+    (if files
+        (format nil "~{~A~^~%~}"
+                (mapcar (lambda (f)
+                          (enough-namestring f cwd))
+                        (sort files #'string< :key #'namestring)))
+        (if (and pattern (> (length pattern) 0))
+            (format nil "No files matching '~A' found in ~A" pattern cwd)
+            (format nil "No files found in ~A" cwd)))))
+
+(defun mcp-read-project-file (relative-path)
+  "Read a file from the current working directory."
+  (if (not (safe-project-path-p relative-path))
+      "Error: Invalid path. Must be relative path within project directory."
+      (let ((full-path (merge-pathnames relative-path (uiop:getcwd))))
+        (if (probe-file full-path)
+            (handler-case
+                (let ((content (uiop:read-file-string full-path)))
+                  (if (> (length content) 50000)
+                      (format nil "~A~%~%[... truncated at 50000 chars, file has ~D total chars]"
+                              (subseq content 0 50000)
+                              (length content))
+                      content))
+              (error (e)
+                (format nil "Error reading file: ~A" e)))
+            (format nil "File not found: ~A" relative-path)))))
+
+(defun mcp-get-session-info ()
+  "Get current ICL session information."
+  (with-output-to-string (s)
+    (format s "ICL Session Information~%")
+    (format s "=======================~%~%")
+    (format s "Current package: ~A~%" *icl-package-name*)
+    (format s "Working directory: ~A~%" (uiop:getcwd))
+    (format s "Input count: ~D~%" *input-count*)
+    (format s "~%Recent values:~%")
+    (format s "  * (last result): ~S~%" icl-*)
+    (format s "  ** (second last): ~S~%" icl-**)
+    (format s "  *** (third last): ~S~%" icl-***)
+    (format s "~%Last input form: ~S~%" icl-+)
+    (when *last-was-error*
+      (format s "~%Note: Last evaluation resulted in an error.~%"))))
+
 (defun args-get (args key &optional default)
   "Get value from ARGS which may be a hash table or plist. KEY is a string."
   (cond
@@ -299,6 +385,14 @@
        (mcp-read-source-file (args-get args "path" "")))
       ((string= name "list_source_files")
        (mcp-list-source-files (args-get args "pattern" "")))
+      ((string= name "get_repl_history")
+       (mcp-get-repl-history (args-get args "count" nil)))
+      ((string= name "list_project_files")
+       (mcp-list-project-files (args-get args "pattern" "")))
+      ((string= name "read_project_file")
+       (mcp-read-project-file (args-get args "path" "")))
+      ((string= name "get_session_info")
+       (mcp-get-session-info))
       (t
        (format nil "Unknown tool: ~A" name)))))
 
@@ -311,32 +405,30 @@
 
 USE THESE TOOLS PROACTIVELY to provide accurate, specific information:
 
-1. ALWAYS look up symbols before explaining them:
+1. GET CONTEXT FIRST - understand what the user was doing:
+   - Use get_session_info to see current package, working directory, and recent values
+   - Use get_repl_history to see recent REPL interactions (inputs and results)
+   - This helps you understand errors and what the user is trying to accomplish
+
+2. ALWAYS look up symbols before explaining them:
    - Use describe_symbol first to see type, value, and documentation
    - Use get_function_arglist for function signatures
    - Don't rely on general knowledge - query the live environment
 
-2. CHECK THE ocicl/ DIRECTORY for library source code and documentation:
-   - Use list_source_files to discover what's available
-   - Library sources are in subdirectories (e.g., alexandria-*/, cl-ppcre-*/)
-   - Each library has .lisp source files and .asd system definitions
-   - README files and documentation may also be present
-   - Use read_source_file to read actual implementations and docs
-
-3. When explaining library functions, READ THE SOURCE:
-   - list_source_files with pattern (e.g., \"alexandria*\") to find files
+3. CHECK SOURCE CODE when explaining library functions:
+   - list_source_files with pattern (e.g., \"alexandria*\") to find files in ocicl/
    - read_source_file to get actual implementation code
-   - Quote relevant source in your explanation
+   - For project files, use list_project_files and read_project_file
 
 4. Discover related functionality:
    - Use apropos_search to find related symbols
    - Use list_package_symbols to explore package contents
 
-Example workflow for explaining ALEXANDRIA:WHEN-LET:
-1. describe_symbol ALEXANDRIA:WHEN-LET
-2. list_source_files with pattern \"alexandria*\" to find library files
-3. read_source_file for the relevant .lisp file
-4. Explain with the actual macro definition from source
+Example workflow for explaining an error:
+1. get_repl_history to see what the user typed and the error
+2. get_session_info for current package and values
+3. describe_symbol for any symbols involved
+4. Explain the error with specific context from the session
 
 Be thorough - users expect you to leverage this live environment access."
   "Instructions provided to LLMs via MCP initialize response.")
@@ -438,3 +530,146 @@ Be thorough - users expect you to leverage this live environment access."
         (mcp-log "MCP server error: ~A" e)
         (format *error-output* "MCP server error: ~A~%" e)
         (force-output *error-output*)))))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; HTTP MCP Server (for live REPL access)
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defvar *mcp-http-server* nil
+  "The Hunchentoot acceptor for the HTTP MCP server.")
+
+(defvar *mcp-http-port* 4006
+  "Port for the HTTP MCP server.")
+
+(defvar *sse-message-endpoint* "/mcp/message"
+  "Endpoint for SSE clients to POST messages to.")
+
+(defun mcp-http-handler ()
+  "Handle HTTP requests for MCP protocol.
+   Supports both Streamable HTTP (POST JSON-RPC) and legacy SSE transport (GET for stream)."
+  (let* ((body (hunchentoot:raw-post-data :force-text t))
+         (request-method (hunchentoot:request-method*))
+         (accept-header (hunchentoot:header-in* :accept)))
+    (mcp-log "HTTP ~A request, body length: ~D, accept: ~A"
+             request-method (length body) accept-header)
+    (cond
+      ;; POST - MCP JSON-RPC request (Streamable HTTP transport)
+      ((eq request-method :post)
+       (handler-case
+           (let* ((request (yason:parse body :object-as :plist))
+                  (response (handle-mcp-request request)))
+             (if response
+                 ;; Request with response - return JSON
+                 (progn
+                   (setf (hunchentoot:content-type*) "application/json")
+                   response)
+                 ;; Notification - return 202 Accepted with no body
+                 (progn
+                   (setf (hunchentoot:return-code*) 202)
+                   "")))
+         (error (e)
+           (mcp-log "HTTP MCP error: ~A" e)
+           (setf (hunchentoot:content-type*) "application/json")
+           (make-json-error nil -32700 (format nil "Parse error: ~A" e)))))
+      ;; GET - SSE stream for legacy transport
+      ((eq request-method :get)
+       (if (and accept-header (search "text/event-stream" accept-header))
+           ;; SSE transport - return event stream with endpoint
+           (progn
+             (setf (hunchentoot:content-type*) "text/event-stream")
+             (setf (hunchentoot:header-out :cache-control) "no-cache")
+             (setf (hunchentoot:header-out :connection) "keep-alive")
+             ;; Send endpoint event telling client where to POST
+             (let ((endpoint-url (format nil "http://127.0.0.1:~D~A"
+                                         *mcp-http-port* *sse-message-endpoint*)))
+               (mcp-log "SSE: sending endpoint event: ~A" endpoint-url)
+               (format nil "event: endpoint~%data: ~A~%~%" endpoint-url)))
+           ;; Regular GET - return server info
+           (progn
+             (setf (hunchentoot:content-type*) "application/json")
+             (yason:with-output-to-string* ()
+               (yason:with-object ()
+                 (yason:encode-object-element "name" "icl-mcp-server")
+                 (yason:encode-object-element "version" +version+)
+                 (yason:encode-object-element "protocol" "mcp")
+                 (yason:encode-object-element "protocolVersion" +mcp-protocol-version+))))))
+      ;; Other methods
+      (t
+       (setf (hunchentoot:return-code*) 405)
+       (setf (hunchentoot:content-type*) "application/json")
+       "{\"error\": \"Method not allowed\"}"))))
+
+(defun mcp-sse-message-handler ()
+  "Handle POST requests to the SSE message endpoint."
+  (let ((body (hunchentoot:raw-post-data :force-text t)))
+    (mcp-log "SSE message POST, body length: ~D" (length body))
+    (handler-case
+        (let* ((request (yason:parse body :object-as :plist))
+               (response (handle-mcp-request request)))
+          (if response
+              (progn
+                (setf (hunchentoot:content-type*) "application/json")
+                response)
+              (progn
+                (setf (hunchentoot:return-code*) 202)
+                "")))
+      (error (e)
+        (mcp-log "SSE message error: ~A" e)
+        (setf (hunchentoot:content-type*) "application/json")
+        (make-json-error nil -32700 (format nil "Parse error: ~A" e))))))
+
+(defun start-mcp-http-server (&key (port *mcp-http-port*))
+  "Start the HTTP MCP server on PORT.
+   This allows AI CLIs to connect via HTTP to the live REPL session."
+  (when *mcp-http-server*
+    (mcp-log "HTTP MCP server already running")
+    (return-from start-mcp-http-server *mcp-http-port*))
+  (setf *mcp-http-port* port)
+  ;; Create route for /mcp endpoint (main MCP endpoint)
+  (hunchentoot:define-easy-handler (mcp-endpoint :uri "/mcp") ()
+    (mcp-http-handler))
+  ;; SSE message endpoint for legacy SSE transport
+  (hunchentoot:define-easy-handler (mcp-sse-endpoint :uri "/mcp/message") ()
+    (mcp-sse-message-handler))
+  ;; Also handle root for convenience
+  (hunchentoot:define-easy-handler (mcp-root :uri "/") ()
+    (mcp-http-handler))
+  ;; Start the server
+  (handler-case
+      (progn
+        (setf *mcp-http-server*
+              (hunchentoot:start
+               (make-instance 'hunchentoot:easy-acceptor
+                              :port port
+                              :address "127.0.0.1"
+                              ;; Suppress Hunchentoot's default logging
+                              :access-log-destination nil
+                              :message-log-destination nil)))
+        (mcp-log "HTTP MCP server started on port ~D" port)
+        port)
+    (error (e)
+      (mcp-log "Failed to start HTTP MCP server: ~A" e)
+      nil)))
+
+(defun stop-mcp-http-server ()
+  "Stop the HTTP MCP server."
+  (when *mcp-http-server*
+    (handler-case
+        (progn
+          (hunchentoot:stop *mcp-http-server*)
+          (mcp-log "HTTP MCP server stopped")
+          (setf *mcp-http-server* nil)
+          t)
+      (error (e)
+        (mcp-log "Error stopping HTTP MCP server: ~A" e)
+        nil))))
+
+(defun mcp-http-server-running-p ()
+  "Return T if the HTTP MCP server is running."
+  (and *mcp-http-server*
+       (hunchentoot:started-p *mcp-http-server*)))
+
+(defun mcp-http-server-url ()
+  "Return the URL of the HTTP MCP server if running."
+  (when (mcp-http-server-running-p)
+    (format nil "http://127.0.0.1:~D/mcp" *mcp-http-port*)))

@@ -23,6 +23,8 @@
                :yason
                ;; Markdown rendering for AI output
                :tuition
+               ;; HTTP server for MCP
+               :hunchentoot
                ;; POSIX-only dependencies
                (:feature (:not :windows) :osicat))
   :serial t
