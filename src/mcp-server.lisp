@@ -306,6 +306,41 @@
 ;;; MCP Request Handlers
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
+(defparameter *mcp-instructions*
+  "You are connected to ICL (Interactive Common Lisp), a live Lisp REPL environment.
+
+USE THESE TOOLS PROACTIVELY to provide accurate, specific information:
+
+1. ALWAYS look up symbols before explaining them:
+   - Use describe_symbol first to see type, value, and documentation
+   - Use get_function_arglist for function signatures
+   - Don't rely on general knowledge - query the live environment
+
+2. CHECK THE ocicl/ DIRECTORY for library source code and documentation:
+   - Use list_source_files to discover what's available
+   - Library sources are in subdirectories (e.g., alexandria-*/, cl-ppcre-*/)
+   - Each library has .lisp source files and .asd system definitions
+   - README files and documentation may also be present
+   - Use read_source_file to read actual implementations and docs
+
+3. When explaining library functions, READ THE SOURCE:
+   - list_source_files with pattern (e.g., \"alexandria*\") to find files
+   - read_source_file to get actual implementation code
+   - Quote relevant source in your explanation
+
+4. Discover related functionality:
+   - Use apropos_search to find related symbols
+   - Use list_package_symbols to explore package contents
+
+Example workflow for explaining ALEXANDRIA:WHEN-LET:
+1. describe_symbol ALEXANDRIA:WHEN-LET
+2. list_source_files with pattern \"alexandria*\" to find library files
+3. read_source_file for the relevant .lisp file
+4. Explain with the actual macro definition from source
+
+Be thorough - users expect you to leverage this live environment access."
+  "Instructions provided to LLMs via MCP initialize response.")
+
 (defun handle-initialize (id params)
   "Handle MCP initialize request."
   (declare (ignore params))
@@ -323,6 +358,7 @@
     (setf (gethash "protocolVersion" result) +mcp-protocol-version+)
     (setf (gethash "capabilities" result) capabilities)
     (setf (gethash "serverInfo" result) server-info)
+    (setf (gethash "instructions" result) *mcp-instructions*)
     (make-json-response id result)))
 
 (defun handle-tools-list (id params)

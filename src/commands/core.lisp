@@ -1342,24 +1342,33 @@ Example: ,paredit        ; toggle
                       (when *slynk-connected-p*
                         (format nil "~A:~D" *slynk-host* *slynk-port*)))))
     (if with-mcp-tools
-        (format nil "~A~%~%You have access to ICL MCP tools to query the live Lisp environment. ALWAYS use these tools to look up information about symbols, functions, and packages mentioned in the code - do not guess or rely on general knowledge.
+        (format nil "~A
+
+You have access to ICL MCP tools that query the LIVE Lisp environment. This is crucial - you can see actual definitions, current values, and real documentation from the running system.
+
+IMPORTANT: Use these tools proactively! Don't guess about Lisp symbols - look them up. The user is in an interactive session and expects accurate, specific information.
 
 Available tools:
-- get_documentation: Get docstring for a symbol (function, variable, or type)
-- describe_symbol: Get full description of a symbol including its current value/definition
-- apropos_search: Search for symbols by name pattern
-- list_package_symbols: List all exported symbols from a package
-- get_function_arglist: Get the lambda list for a function/macro
-- read_source_file: Read source code from library files in ocicl/
-- list_source_files: List available source files in ocicl/
+- describe_symbol: Get full description including type, value, and docs. USE THIS FIRST for any symbol.
+- get_documentation: Get docstrings (function/variable/type)
+- get_function_arglist: Get parameter list for functions/macros
+- apropos_search: Find symbols by pattern - great for discovering related functions
+- list_package_symbols: See what a package exports
+- list_source_files: Check what library source files exist in ocicl/ (e.g., pattern \"alexandria*\")
+- read_source_file: Read source code and documentation from ocicl/ directory
 
-Before calling any tool, output a visual marker so the user can see when tools are being used. Example:
+CHECK THE ocicl/ DIRECTORY: It likely contains source code and documentation for loaded libraries.
+- Use list_source_files to discover available files
+- Libraries are in subdirs like alexandria-*/, cl-ppcre-*/, with .lisp source and READMEs
+- Use read_source_file to read actual implementations and documentation
 
-Let me look up the documentation for that function.
+When explaining library code:
+1. describe_symbol to get the symbol's info
+2. list_source_files with a pattern to find the library's files
+3. read_source_file to get the actual source code
+4. Quote relevant code in your explanation
 
-*[Invoking describe_symbol]*
-
-According to the description, FOO is defined as..." base)
+Show tool usage with markers like: *[Looking up symbol...]* or *[Reading source...]*" base)
         base)))
 
 (define-command explain (&rest args)
