@@ -47,6 +47,9 @@
 (defun repl-iteration ()
   "Process a single REPL iteration: read, dispatch, and handle."
   (let ((input (read-complete-input)))
+    ;; Handle cancel (Ctrl-C) from multiline editor
+    (when (eql input :cancel)
+      (invoke-restart 'abort))
     ;; Handle EOF (Ctrl-D)
     (when (null input)
       (format t "~&")

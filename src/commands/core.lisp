@@ -566,6 +566,71 @@ Example: ,source my-function"
         (t
          (format t "  ~S~%" loc-data))))))
 
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Cross-Reference (Xref)
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(define-command (callers xc) (symbol-name)
+  "Show functions that call SYMBOL-NAME.
+Example: ,callers mapcar"
+  (handler-case
+      (let ((callers (slynk-list-callers (make-symbol (string-upcase symbol-name)))))
+        (if callers
+            (progn
+              (format t "~&Functions that call ~A:~%" (string-upcase symbol-name))
+              (dolist (caller callers)
+                (format-xref-entry caller)))
+            (format t "~&No callers found for: ~A~%" symbol-name)))
+    (error (e)
+      (format *error-output* "~&Error: ~A~%" e))))
+
+(define-command (callees xe) (symbol-name)
+  "Show functions called by SYMBOL-NAME.
+Example: ,callees my-function"
+  (handler-case
+      (let ((callees (slynk-list-callees (make-symbol (string-upcase symbol-name)))))
+        (if callees
+            (progn
+              (format t "~&Functions called by ~A:~%" (string-upcase symbol-name))
+              (dolist (callee callees)
+                (format-xref-entry callee)))
+            (format t "~&No callees found for: ~A~%" symbol-name)))
+    (error (e)
+      (format *error-output* "~&Error: ~A~%" e))))
+
+(define-command (references xr) (symbol-name)
+  "Show code that references variable SYMBOL-NAME.
+Example: ,references *standard-output*"
+  (handler-case
+      (let ((refs (slynk-who-references (make-symbol (string-upcase symbol-name)))))
+        (if refs
+            (progn
+              (format t "~&References to ~A:~%" (string-upcase symbol-name))
+              (dolist (ref refs)
+                (format-xref-entry ref)))
+            (format t "~&No references found for: ~A~%" symbol-name)))
+    (error (e)
+      (format *error-output* "~&Error: ~A~%" e))))
+
+(defun format-xref-entry (entry)
+  "Format an xref entry for display.
+   Entry format varies: (name location) or just name."
+  (cond
+    ((and (listp entry) (>= (length entry) 2))
+     (let ((name (first entry))
+           (loc (second entry)))
+       (format t "  ~A" name)
+       (when (and (listp loc) (eq (first loc) :location))
+         (let* ((props (rest loc))
+                (file (second (assoc :file props))))
+           (when file
+             (format t " (~A)" (file-namestring file)))))
+       (format t "~%")))
+    ((symbolp entry)
+     (format t "  ~A~%" entry))
+    (t
+     (format t "  ~S~%" entry))))
+
 (defun byte-offset-to-line (file offset)
   "Convert byte OFFSET to line number in FILE.
 Returns 1 if file cannot be read or offset is invalid."
@@ -857,13 +922,22 @@ Example: ,load /path/to/file.lisp"
       (format *error-output* "~&Error loading file: ~A~%" e))))
 
 (defun expand-filename (filename)
-  "Expand ~ in FILENAME to home directory."
+  "Expand ~ in FILENAME to home directory.
+   Handles ~, ~/, and ~/path. Does not support ~user syntax."
   (let ((name (string-trim '(#\Space #\Tab #\") filename)))
-    (if (and (plusp (length name))
-             (char= (char name 0) #\~))
-        (merge-pathnames (subseq name 2)
-                         (user-homedir-pathname))
-        name)))
+    (cond
+      ;; Empty string
+      ((zerop (length name)) name)
+      ;; Doesn't start with ~
+      ((char/= (char name 0) #\~) name)
+      ;; Just "~"
+      ((= (length name) 1)
+       (user-homedir-pathname))
+      ;; "~/" or "~/..."
+      ((char= (char name 1) #\/)
+       (merge-pathnames (subseq name 2) (user-homedir-pathname)))
+      ;; "~user" syntax - not supported, return as-is
+      (t name))))
 
 (defun slynk-load-file (filename)
   "Load FILENAME via Slynk with streaming output."

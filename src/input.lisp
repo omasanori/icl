@@ -30,7 +30,8 @@
   "Generate the primary prompt string with dimmed package name."
   (if *prompt-hook*
       (funcall *prompt-hook* *icl-package*)
-      (format nil "~A> " (colorize *icl-package-name* *color-prompt*))))
+      (format nil (or *prompt-string* "~A> ")
+              (colorize *icl-package-name* *color-prompt*))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Input Reading
@@ -59,11 +60,17 @@
   "Generate continuation prompt aligned with primary prompt (dimmed)."
   (let* ((primary (make-prompt))
          (width (visible-string-length primary)))
-    ;; Create aligned continuation: dots followed by space (dimmed)
-    (colorize (concatenate 'string
-                           (make-string (max 0 (- width 2)) :initial-element #\.)
-                           ". ")
-              *color-prompt*)))
+    (cond
+      ;; Allow users to override with a literal continuation prompt string.
+      ((and (stringp *continuation-prompt*)
+            (not (string= *continuation-prompt* ".. ")))
+       (colorize *continuation-prompt* *color-prompt*))
+      ;; Default: aligned dots matching primary prompt width.
+      (t
+       (colorize (concatenate 'string
+                              (make-string (max 0 (- width 2)) :initial-element #\.)
+                              ". ")
+                 *color-prompt*)))))
 
 (defun read-complete-input ()
   "Read a complete Lisp form with appropriate backend.
@@ -83,8 +90,8 @@
                  :continuation-prompt (make-continuation-prompt))))
     (cond
       ((eql result :cancel)
-       ;; User hit Ctrl-C, return empty to trigger abort restart
-       "")
+       ;; User hit Ctrl-C; propagate sentinel for REPL abort handling
+       :cancel)
       ((eql result :not-a-tty)
        ;; Not a real terminal, fall back to simple
        (read-with-simple-continuation))

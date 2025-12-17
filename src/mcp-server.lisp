@@ -241,12 +241,27 @@
     (error (e)
       (format nil "Error: ~A" e))))
 
+(defun windows-absolute-path-p (path)
+  "Check if PATH looks like a Windows absolute path (e.g., C:\\ or D:/)."
+  (and (>= (length path) 2)
+       (alpha-char-p (char path 0))
+       (char= (char path 1) #\:)))
+
+(defun safe-glob-pattern-p (pattern)
+  "Check if PATTERN is safe (no parent directory traversal)."
+  (and (stringp pattern)
+       (not (search ".." pattern))
+       (not (windows-absolute-path-p pattern))
+       (not (and (plusp (length pattern))
+                 (char= (char pattern 0) #\/)))))
+
 (defun safe-ocicl-path-p (path)
   "Check if PATH is safe (within ocicl directory, no ..)."
   (and (stringp path)
        (> (length path) 0)
        (not (search ".." path))
-       (not (char= (char path 0) #\/))))
+       (not (char= (char path 0) #\/))
+       (not (windows-absolute-path-p path))))
 
 (defun mcp-read-source-file (relative-path)
   "Read a source file from the ocicl directory."
@@ -263,6 +278,10 @@
 
 (defun mcp-list-source-files (pattern)
   "List Lisp source files in ocicl directory matching PATTERN."
+  ;; Validate pattern to prevent directory traversal
+  (when (and pattern (> (length pattern) 0) (not (safe-glob-pattern-p pattern)))
+    (return-from mcp-list-source-files
+      "Error: Invalid pattern. Must not contain '..' or absolute paths."))
   (let* ((ocicl-dir (merge-pathnames "ocicl/" (uiop:getcwd)))
          (glob-pattern (if (and pattern (> (length pattern) 0))
                            (format nil "~A/**/*.lisp" pattern)
@@ -300,10 +319,15 @@
        (> (length path) 0)
        (not (search ".." path))
        (not (char= (char path 0) #\/))
-       (not (char= (char path 0) #\~))))
+       (not (char= (char path 0) #\~))
+       (not (windows-absolute-path-p path))))
 
 (defun mcp-list-project-files (pattern)
   "List files in current directory matching PATTERN."
+  ;; Validate pattern to prevent directory traversal
+  (when (and pattern (> (length pattern) 0) (not (safe-glob-pattern-p pattern)))
+    (return-from mcp-list-project-files
+      "Error: Invalid pattern. Must not contain '..' or absolute paths."))
   (let* ((cwd (uiop:getcwd))
          (glob-pattern (if (and pattern (> (length pattern) 0))
                            pattern

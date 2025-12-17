@@ -89,9 +89,8 @@
                           ((listp result) result)
                           ((null result) nil)
                           (t (list result)))))
-            (when (and form values)
-              (update-result-history form values))
             (when form
+              (update-result-history form values)
               (run-after-eval-hooks form values)))
           ;; Record for MCP history access
           (let ((result-str (cond

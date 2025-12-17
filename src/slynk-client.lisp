@@ -156,7 +156,9 @@
   (unless *slynk-connected-p*
     (error "Not connected to backend server"))
   (slynk-client:slime-eval
-   `(cl:documentation (cl:find-symbol ,(string-upcase name)) ',type)
+   `(cl:let ((sym (cl:read-from-string ,name)))
+      (and (cl:symbolp sym)
+           (cl:documentation sym ',type)))
    *slynk-connection*))
 
 (defun slynk-describe (name &key (package "CL-USER"))
@@ -206,6 +208,38 @@
     (error "Not connected to backend server"))
   (slynk-client:slime-eval
    `(cl:funcall (cl:read-from-string "slynk:slynk-macroexpand-all") ,form)
+   *slynk-connection*))
+
+(defun slynk-who-calls (name)
+  "Find all functions that call NAME."
+  (unless *slynk-connected-p*
+    (error "Not connected to backend server"))
+  (slynk-client:slime-eval
+   `(cl:funcall (cl:read-from-string "slynk-backend:who-calls") ',name)
+   *slynk-connection*))
+
+(defun slynk-who-references (name)
+  "Find all code that references variable NAME."
+  (unless *slynk-connected-p*
+    (error "Not connected to backend server"))
+  (slynk-client:slime-eval
+   `(cl:funcall (cl:read-from-string "slynk-backend:who-references") ',name)
+   *slynk-connection*))
+
+(defun slynk-list-callers (name)
+  "List functions that call NAME."
+  (unless *slynk-connected-p*
+    (error "Not connected to backend server"))
+  (slynk-client:slime-eval
+   `(cl:funcall (cl:read-from-string "slynk-backend:list-callers") ',name)
+   *slynk-connection*))
+
+(defun slynk-list-callees (name)
+  "List functions called by NAME."
+  (unless *slynk-connected-p*
+    (error "Not connected to backend server"))
+  (slynk-client:slime-eval
+   `(cl:funcall (cl:read-from-string "slynk-backend:list-callees") ',name)
    *slynk-connection*))
 
 (defun slynk-list-packages ()
