@@ -105,6 +105,14 @@ Commands are prefixed with a comma. Type `,help` for a full list.
 | `,source <symbol>` | Show source location |
 | `,edit <symbol>` | Open source in `$EDITOR` (alias: `,ed`) |
 
+### Cross-Reference (Xref)
+
+| Command | Description |
+|---------|-------------|
+| `,callers <symbol>` | Show functions that call symbol (alias: `,xc`) |
+| `,callees <symbol>` | Show functions called by symbol (alias: `,xe`) |
+| `,references <symbol>` | Show code that references variable (alias: `,xr`) |
+
 ### Inspection
 
 | Command | Description |
@@ -320,11 +328,60 @@ ICL aims to support multiple Common Lisp implementations. SBCL is the primary de
 
 ## Architecture
 
-ICL operates as a frontend that communicates with a backend Lisp process via the Slynk protocol (from SLY). This architecture allows ICL to:
+ICL operates as a frontend that communicates with a backend Lisp process via the Slynk protocol (from SLY). This architecture allows ICL to work with any Common Lisp implementation, provide consistent features regardless of backend, and connect to remote Lisp processes.
 
-- Work with any Common Lisp implementation
-- Provide consistent features regardless of backend
-- Connect to remote Lisp processes
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            USER TERMINAL                                │
+└────────────────────────────────────┬────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                                 ICL                                     │
+│                       (Interactive Common Lisp)                         │
+│                                                                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐     │
+│  │  Multiline  │  │   Command   │  │     Tab     │  │   History   │     │
+│  │   Editor    │  │ Dispatcher  │  │ Completion  │  │   Manager   │     │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘     │
+│                                                                         │
+│  ┌───────────────────────────┐    ┌─────────────────────────────────┐   │
+│  │      Slynk Client         │    │      MCP HTTP Server            │   │
+│  │  (Backend Communication)  │    │    (AI Tool Integration)        │   │
+│  └─────────────┬─────────────┘    └───────────────▲─────────────────┘   │
+└────────────────┼──────────────────────────────────┼─────────────────────┘
+                 │                                  │
+                 │ Slynk Protocol                   │ HTTP (Streamable MCP)
+                 │ (localhost:random-port)          │ (localhost:random-port)
+                 │                                  │
+                 ▼                                  │
+┌────────────────────────────────┐  ┌───────────────┴─────────────────────┐
+│        INFERIOR LISP           │  │          AI CLI TOOLS               │
+│       (Backend Process)        │  │                                     │
+│                                │  │  ┌─────────┐ ┌────────┐ ┌────────┐  │
+│  ┌──────────────────────────┐  │  │  │ Claude  │ │ Gemini │ │ Codex  │  │
+│  │      Slynk Server        │  │  │  │   CLI   │ │  CLI   │ │  CLI   │  │
+│  │                          │  │  │  └────┬────┘ └───┬────┘ └───┬────┘  │
+│  │  • Evaluation            │  │  │       └──────────┼──────────┘       │
+│  │  • Completion            │  │  │                  │                  │
+│  │  • Xref                  │  │  │                  ▼                  │
+│  │  • Inspection            │  │  │  ┌───────────────────────────────┐  │
+│  │  • Macroexpansion        │  │  │  │    MCP Protocol Client        │  │
+│  └──────────────────────────┘  │  │  │                               │  │
+│                                │  │  │  Read-only tools:             │  │
+│  ┌──────────────────────────┐  │  │  │  • get_documentation          │  │
+│  │   User's Lisp Image      │  │  │  │  • describe_symbol            │  │
+│  │                          │  │  │  │  • apropos_search             │  │
+│  │  • Loaded libraries      │  │  │  │  • get_function_arglist       │  │
+│  │  • User definitions      │  │  │  │  • get_repl_history           │  │
+│  │  • REPL state            │  │  │  │  • list/read_project_files    │  │
+│  └──────────────────────────┘  │  │  └───────────────────────────────┘  │
+│                                │  │                                     │
+│  SBCL │ CCL │ ECL │ ABCL │ ... │  │  AI cannot execute code             │
+└────────────────────────────────┘  └─────────────────────────────────────┘
+```
+
+Both connections use randomly-assigned ports on localhost for security. When ICL starts an inferior Lisp, it finds an available port and configures Slynk to listen there. Similarly, the MCP server (started on-demand by `,explain`) binds to a random available port.
 
 ## License
 
