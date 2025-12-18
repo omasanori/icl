@@ -22,10 +22,25 @@ exec ros -Q -- $0 "$@"
 (defun find-icl-directory ()
   "Find the ICL installation directory."
   (let* ((script-path (or *load-pathname* *compile-file-pathname*))
-         (roswell-dir (when script-path
-                        (make-pathname :directory (butlast (pathname-directory script-path))
-                                       :defaults script-path))))
-    roswell-dir))
+         (script-dir (when script-path
+                       (make-pathname :directory (butlast (pathname-directory script-path))
+                                      :defaults script-path)))
+         ;; Standard roswell installation location
+         (roswell-dir (merge-pathnames ".roswell/" (user-homedir-pathname)))
+         (roswell-install-dir (when (probe-file roswell-dir)
+                                (merge-pathnames "local-projects/atgreen/icl/"
+                                                 (truename roswell-dir)))))
+    ;; Try script directory first, fall back to roswell standard location
+    (cond
+      ;; If script dir has icl.asd, use it
+      ((and script-dir (probe-file (merge-pathnames "icl.asd" script-dir)))
+       script-dir)
+      ;; Check roswell standard installation location
+      ((and roswell-install-dir
+            (probe-file (merge-pathnames "icl.asd" roswell-install-dir)))
+       roswell-install-dir)
+      ;; Last resort: return script-dir even if icl.asd not found
+      (t script-dir))))
 
 (defun setup-ocicl-deps (icl-dir)
   "Setup ASDF to find ocicl dependencies."
