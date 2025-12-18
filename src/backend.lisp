@@ -26,14 +26,15 @@
     (:ecl :program "ecl" :args nil :eval-arg "-eval")
     (:clisp :program "clisp" :args nil :eval-arg "-x")
     (:abcl :program "abcl" :args nil :eval-arg "--eval")
-    (:clasp :program "clasp" :args nil :eval-arg "--eval"))
+    (:clasp :program "clasp" :args nil :eval-arg "--eval")
+    (:roswell :program "ros" :args ("run" "--") :eval-arg "--eval"))
   "Known Lisp implementations and how to invoke them.")
 
 (defvar *default-lisp* :sbcl
   "Default Lisp implementation to use.")
 
 (defvar *lisp-implementation-order*
-  '(:sbcl :ccl :ecl :clisp :abcl :clasp)
+  '(:roswell :sbcl :ccl :ecl :clisp :abcl :clasp)
   "Order in which to try Lisp implementations when auto-detecting.")
 
 (defvar *current-lisp* nil
