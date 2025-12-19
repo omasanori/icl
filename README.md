@@ -1,6 +1,6 @@
 # ICL - Interactive Common Lisp
 
-ICL is an enhanced REPL for Common Lisp. It provides a modern, terminal-based interactive experience with readline-style editing, persistent history, tab completion, and an extensible command system.
+ICL is an enhanced REPL for Common Lisp. It provides a modern interactive experience with readline-style editing, persistent history, tab completion, and an extensible command system. ICL works in your terminal or in a web browser with an IDE-style interface featuring package browsing, symbol inspection, and an integrated REPL.
 
 <p align="center">
   <img src="assets/demo.gif" alt="ICL Demo">
@@ -24,6 +24,7 @@ ICL is an enhanced REPL for Common Lisp. It provides a modern, terminal-based in
 - **Source location** - Find where functions are defined
 - **Terminal-aware colors** - Automatically detects light/dark terminal background
 - **AI integration** - Use `,explain` to get AI-powered explanations of code, errors, and results
+- **Browser interface** - IDE-style web UI with package browser, symbol list, inspector, and xterm.js terminal
 
 ## Installation
 
@@ -187,6 +188,7 @@ The interactive inspector (`,i` or `,inspect`) provides a TUI for exploring obje
 | `,info` | Show session information |
 | `,history` | Show value history variables |
 | `,lisp [name]` | Show or switch Lisp backend |
+| `,browse` | Open browser-based IDE interface |
 | `,clear` | Clear terminal |
 | `,quit` | Exit ICL |
 
@@ -337,7 +339,7 @@ ICL operates as a frontend that communicates with a backend Lisp process via the
 │          USER TERMINAL           │   │          WEB BROWSER             │
 │                                  │   │  ┌────────────────────────────┐  │
 │  $ icl                           │   │  │  Packages │ Symbols │ Insp │  │
-│  COMMON-LISP-USER> _             │   │  ├──────────┴─────────┴──────┤  │
+│  COMMON-LISP-USER> _             │   │  ├───────────┴─────────┴──────┤  │
 │                                  │   │  │     xterm.js Terminal      │  │
 │                                  │   │  │  COMMON-LISP-USER> _       │  │
 └────────────────┬─────────────────┘   └──┼────────────────────────────┴──┘
