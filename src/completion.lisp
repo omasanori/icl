@@ -729,14 +729,11 @@
         (values new-line (+ start (length selected)))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
-;;; Menu Rendering (ANSI escape codes)
+;;; Menu Rendering
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
-(defvar *ansi-reset* (format nil "~C[0m" #\Escape))
-(defvar *ansi-reverse* (format nil "~C[7m" #\Escape))
-(defvar *ansi-dim* (format nil "~C[2m" #\Escape))
-(defvar *ansi-bold* (format nil "~C[1m" #\Escape))
-(defvar *ansi-fg-gray* (format nil "~C[38;5;245m" #\Escape))
+;;; ANSI escape codes are defined in specials.lisp:
+;;; *ansi-reset*, *ansi-reverse*, *ansi-dim*, *ansi-bold*, *ansi-fg-gray*
 
 (defun render-completion-menu (prompt-len cursor-col)
   "Render the completion dropdown menu.

@@ -32,7 +32,7 @@
   (if *prompt-hook*
       (funcall *prompt-hook* *icl-package*)
       (format nil (or *prompt-string* "~A> ")
-              (colorize *icl-package-name* *color-prompt*))))
+              (colorize *icl-package-name* *ansi-prompt*))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Input Reading
@@ -65,13 +65,13 @@
       ;; Allow users to override with a literal continuation prompt string.
       ((and (stringp *continuation-prompt*)
             (not (string= *continuation-prompt* ".. ")))
-       (colorize *continuation-prompt* *color-prompt*))
+       (colorize *continuation-prompt* *ansi-prompt*))
       ;; Default: aligned dots matching primary prompt width.
       (t
        (colorize (concatenate 'string
                               (make-string (max 0 (- width 2)) :initial-element #\.)
                               ". ")
-                 *color-prompt*)))))
+                 *ansi-prompt*)))))
 
 (defun read-complete-input ()
   "Read a complete Lisp form with appropriate backend.

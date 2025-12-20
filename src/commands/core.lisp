@@ -1309,6 +1309,131 @@ Example: ,paredit        ; toggle
      (format *error-output* "~&Invalid argument: ~A (use on/off)~%" state))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Theme Commands
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(define-command theme (&optional subcommand arg)
+  "Manage terminal and browser themes.
+Example: ,theme                    - Show current themes
+         ,theme list               - List all available themes
+         ,theme terminal <name>    - Set terminal theme
+         ,theme browser <name>     - Set browser theme
+         ,theme auto               - Auto-detect and apply based on dark mode"
+  (cond
+    ;; No args - show current themes
+    ((null subcommand)
+     (format t "~&Current themes:~%")
+     (format t "  Terminal: ~A~@[ (~A)~]~%"
+             (or (current-terminal-theme-name) "none")
+             (when *current-terminal-theme*
+               (terminal-theme-display-name *current-terminal-theme*)))
+     (format t "  Browser:  ~A~@[ (~A)~]~%"
+             (or (current-browser-theme-name) "none")
+             (when *current-browser-theme*
+               (browser-theme-display-name *current-browser-theme*)))
+     (format t "~%Use ,theme list to see available themes.~%"))
+
+    ;; List themes
+    ((string-equal subcommand "list")
+     (format t "~&Terminal themes:~%")
+     (let ((dark-themes nil)
+           (light-themes nil))
+       (dolist (theme (list-terminal-themes))
+         (if (terminal-theme-dark-p theme)
+             (push theme dark-themes)
+             (push theme light-themes)))
+       (format t "  Dark:~%")
+       (dolist (theme (nreverse dark-themes))
+         (let ((current (eq theme *current-terminal-theme*)))
+           (format t "    ~A~A - ~A~%"
+                   (if current "*" " ")
+                   (string-downcase (symbol-name (terminal-theme-name theme)))
+                   (terminal-theme-display-name theme))))
+       (format t "  Light:~%")
+       (dolist (theme (nreverse light-themes))
+         (let ((current (eq theme *current-terminal-theme*)))
+           (format t "    ~A~A - ~A~%"
+                   (if current "*" " ")
+                   (string-downcase (symbol-name (terminal-theme-name theme)))
+                   (terminal-theme-display-name theme)))))
+     (format t "~%Browser themes:~%")
+     (let ((dark-themes nil)
+           (light-themes nil))
+       (dolist (theme (list-browser-themes))
+         (if (browser-theme-dark-p theme)
+             (push theme dark-themes)
+             (push theme light-themes)))
+       (format t "  Dark:~%")
+       (dolist (theme (nreverse dark-themes))
+         (let ((current (eq theme *current-browser-theme*)))
+           (format t "    ~A~A - ~A~%"
+                   (if current "*" " ")
+                   (string-downcase (symbol-name (browser-theme-name theme)))
+                   (browser-theme-display-name theme))))
+       (format t "  Light:~%")
+       (dolist (theme (nreverse light-themes))
+         (let ((current (eq theme *current-browser-theme*)))
+           (format t "    ~A~A - ~A~%"
+                   (if current "*" " ")
+                   (string-downcase (symbol-name (browser-theme-name theme)))
+                   (browser-theme-display-name theme)))))
+     (format t "~%(* = current)~%"))
+
+    ;; Set terminal theme
+    ((string-equal subcommand "terminal")
+     (if (null arg)
+         (format *error-output* "~&Usage: ,theme terminal <theme-name>~%")
+         (let ((name (intern (string-upcase arg) :keyword)))
+           (if (find-terminal-theme name)
+               (progn
+                 (apply-terminal-theme name)
+                 (format t "~&Terminal theme set to: ~A~%"
+                         (terminal-theme-display-name *current-terminal-theme*)))
+               (format *error-output* "~&Unknown terminal theme: ~A~%Use ,theme list to see available themes.~%" arg)))))
+
+    ;; Set browser theme
+    ((string-equal subcommand "browser")
+     (if (null arg)
+         (format *error-output* "~&Usage: ,theme browser <theme-name>~%")
+         (let ((name (intern (string-upcase arg) :keyword)))
+           (if (find-browser-theme name)
+               (progn
+                 (apply-browser-theme name)
+                 (format t "~&Browser theme set to: ~A~%"
+                         (browser-theme-display-name *current-browser-theme*)))
+               (format *error-output* "~&Unknown browser theme: ~A~%Use ,theme list to see available themes.~%" arg)))))
+
+    ;; Auto-detect
+    ((string-equal subcommand "auto")
+     (auto-select-terminal-theme)
+     (auto-select-browser-theme)
+     (format t "~&Auto-detected themes:~%")
+     (format t "  Terminal: ~A~%" (terminal-theme-display-name *current-terminal-theme*))
+     (format t "  Browser:  ~A~%" (browser-theme-display-name *current-browser-theme*)))
+
+    ;; Unknown subcommand - try as theme name for both
+    (t
+     (let ((name (intern (string-upcase subcommand) :keyword)))
+       (cond
+         ;; Check if it's a known theme name
+         ((and (find-terminal-theme name) (find-browser-theme name))
+          (apply-terminal-theme name)
+          (apply-browser-theme name)
+          (format t "~&Theme set to: ~A (terminal and browser)~%"
+                  (terminal-theme-display-name *current-terminal-theme*)))
+         ((find-terminal-theme name)
+          (apply-terminal-theme name)
+          (format t "~&Terminal theme set to: ~A~%"
+                  (terminal-theme-display-name *current-terminal-theme*)))
+         ((find-browser-theme name)
+          (apply-browser-theme name)
+          (format t "~&Browser theme set to: ~A~%"
+                  (browser-theme-display-name *current-browser-theme*)))
+         (t
+          (format *error-output* "~&Unknown subcommand or theme: ~A~%"subcommand)
+          (format *error-output* "~&Use ,theme list to see available options.~%")))))))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; AI CLI Integration
 ;;; ─────────────────────────────────────────────────────────────────────────────
 

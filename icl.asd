@@ -36,6 +36,7 @@
                 :components
                 ((:file "package")
                  (:file "specials")
+                 (:file "themes")
                  (:file "terminal-posix" :if-feature (:not :windows))
                  (:file "terminal-windows" :if-feature :windows)
                  (:file "buffer")

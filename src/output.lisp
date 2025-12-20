@@ -40,7 +40,6 @@
 (defvar *color-list* (format nil "~C[38;5;252m" #\Escape))     ; Light gray
 (defvar *color-error* (format nil "~C[38;5;196m" #\Escape))    ; Bright red
 (defvar *color-prefix* (format nil "~C[38;5;244m" #\Escape))   ; Gray for =>
-(defvar *color-prompt* (format nil "~C[38;5;240m" #\Escape))   ; Dark gray for prompt
 
 (defun colors-enabled-p ()
   "Return T if colors should be used.
@@ -50,9 +49,13 @@
        (terminal-capable-p)))
 
 (defun colorize (text color)
-  "Wrap TEXT with COLOR codes if colors are enabled."
+  "Wrap TEXT with COLOR codes if colors are enabled.
+   COLOR can be an ANSI escape string or a 256-color code number."
   (if (colors-enabled-p)
-      (format nil "~A~A~A" color text *color-reset*)
+      (let ((color-seq (if (integerp color)
+                           (format nil "~C[38;5;~Dm" #\Escape color)
+                           color)))
+        (format nil "~A~A~A" color-seq text *color-reset*))
       text))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +78,7 @@
   "Display spinner with optional MESSAGE. Call repeatedly to animate."
   (format t "~C[2K~C[G~A ~A"
           #\Escape #\Escape
-          (colorize (spinner-frame) *color-prompt*)
+          (colorize (spinner-frame) *ansi-prompt*)
           (or message ""))
   (force-output))
 

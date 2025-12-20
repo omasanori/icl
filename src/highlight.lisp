@@ -17,15 +17,34 @@
 ;;; Highlight Colors (ANSI escape codes)
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
-(defvar *hl-string* (format nil "~C[38;5;178m" #\Escape))    ; Gold/Yellow
-(defvar *hl-comment* (format nil "~C[38;5;243m" #\Escape))   ; Gray
-(defvar *hl-keyword* (format nil "~C[38;5;37m" #\Escape))    ; Cyan
-(defvar *hl-number* (format nil "~C[38;5;33m" #\Escape))     ; Blue
-(defvar *hl-special* (format nil "~C[38;5;205m" #\Escape))   ; Magenta/Pink
-(defvar *hl-paren* (format nil "~C[38;5;248m" #\Escape))     ; Light gray
-(defvar *hl-quote* (format nil "~C[38;5;215m" #\Escape))     ; Orange
-(defvar *hl-builtin* (format nil "~C[38;5;75m" #\Escape))    ; Light blue
-(defvar *hl-reset* (format nil "~C[0m" #\Escape))
+;;; These variables hold ANSI escape sequences for syntax highlighting.
+;;; They are regenerated from *hl-*-color* variables by refresh-highlight-colors.
+
+(defvar *hl-string* nil)
+(defvar *hl-comment* nil)
+(defvar *hl-keyword* nil)
+(defvar *hl-number* nil)
+(defvar *hl-special* nil)
+(defvar *hl-paren* nil)
+(defvar *hl-quote* nil)
+(defvar *hl-builtin* nil)
+(defvar *hl-reset* nil)
+
+(defun refresh-highlight-colors ()
+  "Regenerate ANSI escape sequences from color code variables.
+   Called by the theme system when a theme is applied."
+  (setf *hl-string* (format nil "~C[38;5;~Dm" #\Escape *hl-string-color*)
+        *hl-comment* (format nil "~C[38;5;~Dm" #\Escape *hl-comment-color*)
+        *hl-keyword* (format nil "~C[38;5;~Dm" #\Escape *hl-keyword-color*)
+        *hl-number* (format nil "~C[38;5;~Dm" #\Escape *hl-number-color*)
+        *hl-special* (format nil "~C[38;5;~Dm" #\Escape *hl-special-color*)
+        *hl-paren* (format nil "~C[38;5;248m" #\Escape)  ; Always light gray
+        *hl-quote* (format nil "~C[38;5;~Dm" #\Escape *hl-number-color*)  ; Same as number
+        *hl-builtin* (format nil "~C[38;5;~Dm" #\Escape *hl-package-color*)
+        *hl-reset* *ansi-reset*))
+
+;; Initialize with defaults
+(refresh-highlight-colors)
 
 ;; Colors for dark backgrounds
 (defvar *hl-paren-match-dark* (format nil "~C[48;5;239m" #\Escape))      ; Dark gray background

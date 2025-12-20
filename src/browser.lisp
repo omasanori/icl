@@ -108,7 +108,12 @@
                   ;; Check for variable binding
                   (when (boundp sym)
                     (setf (getf result :variable)
-                          (list :value (prin1-to-string (symbol-value sym))
+                          (list :value (ignore-errors
+                                         (let ((*print-length* 10)
+                                               (*print-level* 3)
+                                               (*print-circle* t)
+                                               (*print-pretty* nil))
+                                           (prin1-to-string (symbol-value sym))))
                                 :documentation (documentation sym 'variable)
                                 :constantp (constantp sym))))
                   ;; Check for special operator
@@ -140,6 +145,9 @@
       ;; Close the new connection - only one browser allowed
       (hunchensocket:close-connection client :reason "Only one browser connection allowed")
       (return-from hunchensocket:client-connected)))
+  ;; Send current theme to newly connected client
+  (when *current-browser-theme*
+    (send-browser-theme-to-client client *current-browser-theme*))
   ;; REPL thread will be started when terminal sends 'terminal-ready'
   )
 
@@ -218,7 +226,18 @@
                (bt:make-thread
                 (lambda ()
                   (send-symbol-click-response client symbol-string))
-                :name "symbol-click-handler")))))))))
+                :name "symbol-click-handler"))))
+
+          ;; Client reports dark mode preference
+          ((string= type "dark-mode-preference")
+           (let ((dark-p (gethash "dark" json)))
+             ;; Auto-select browser theme based on client preference
+             (auto-select-browser-theme dark-p)))
+
+          ;; Request current theme
+          ((string= type "get-theme")
+           (when *current-browser-theme*
+             (send-browser-theme-to-client client *current-browser-theme*))))))))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; WebSocket Send Helpers
@@ -351,6 +370,31 @@
                      :entries (or parsed nil)))))
     (error (e)
       (format *error-output* "~&; Error in inspector pop: ~A~%" e))))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Theme Helpers
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defun send-browser-theme-to-client (client theme)
+  "Send THEME to a specific WebSocket CLIENT."
+  (handler-case
+      (let ((json-str (browser-theme-to-json theme)))
+        (let ((msg (make-hash-table :test 'equal)))
+          (setf (gethash "type" msg) "theme")
+          (setf (gethash "data" msg) (com.inuoe.jzon:parse json-str))
+          (hunchensocket:send-text-message client (com.inuoe.jzon:stringify msg))))
+    (error (e)
+      (format *error-output* "~&; Error sending theme: ~A~%" e))))
+
+(defun broadcast-browser-theme-impl (theme)
+  "Broadcast THEME to all connected WebSocket clients.
+   This is the real implementation called from themes.lisp."
+  (when *repl-resource*
+    (dolist (client (hunchensocket:clients *repl-resource*))
+      (send-browser-theme-to-client client theme))))
+
+;; Replace the placeholder in themes.lisp with this implementation
+(setf (symbol-function 'broadcast-browser-theme) #'broadcast-browser-theme-impl)
 
 (defun find-symbol-home-package (symbol-string)
   "Find a symbol and return (package-name . symbol-name) for its HOME package.
@@ -504,24 +548,34 @@
   <link rel='stylesheet' href='/assets/dockview.css'>
   <link rel='stylesheet' href='/assets/xterm.css'>
   <style>
+    /* Default theme variables (will be overridden by server-sent theme) */
+    :root {
+      --bg-primary: #1e1e2e;
+      --bg-secondary: #313244;
+      --bg-tertiary: #45475a;
+      --fg-primary: #cdd6f4;
+      --fg-secondary: #bac2de;
+      --fg-muted: #6c7086;
+      --accent: #89b4fa;
+      --accent-hover: #b4befe;
+      --border: #45475a;
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; overflow: hidden; }
-    body { font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1e1e1e; color: #d4d4d4; }
+    body { font-family: 'JetBrains Mono', monospace; font-size: 13px; background: var(--bg-primary); color: var(--fg-primary); }
     #layout-container { height: 100vh; width: 100vw; }
-    .lm_header { background: #2d2d2d !important; }
-    .lm_tab { background: #2d2d2d !important; color: #d4d4d4 !important; }
-    .lm_tab.lm_active { background: #1e1e1e !important; }
-    .panel { height: 100%%; display: flex; flex-direction: column; overflow: hidden; }
-    .panel-header { padding: 8px; background: #2d2d2d; border-bottom: 1px solid #3d3d3d; flex-shrink: 0; }
-    .panel-header input { width: 100%%; padding: 4px 8px; background: #3d3d3d; border: 1px solid #4d4d4d; color: #d4d4d4; border-radius: 3px; }
+    .panel { height: 100%%; display: flex; flex-direction: column; overflow: hidden; background: var(--bg-primary); }
+    .panel-header { padding: 8px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .panel-header input { width: 100%%; padding: 4px 8px; background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--fg-primary); border-radius: 3px; }
+    .panel-header input:focus { outline: 1px solid var(--accent); }
     .panel-content { flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0; }
     .panel-content::-webkit-scrollbar { width: 8px; }
-    .panel-content::-webkit-scrollbar-track { background: #1e1e1e; }
-    .panel-content::-webkit-scrollbar-thumb { background: #555; border-radius: 4px; }
-    .panel-content::-webkit-scrollbar-thumb:hover { background: #777; }
-    .list-item { padding: 4px 8px; cursor: pointer; }
-    .list-item:hover { background: #2d2d2d; }
-    .list-item.selected { background: #094771; }
+    .panel-content::-webkit-scrollbar-track { background: var(--bg-primary); }
+    .panel-content::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+    .panel-content::-webkit-scrollbar-thumb:hover { background: var(--fg-muted); }
+    .list-item { padding: 4px 8px; cursor: pointer; color: var(--fg-primary); }
+    .list-item:hover { background: var(--bg-secondary); }
+    .list-item.selected { background: var(--accent); color: var(--bg-primary); }
     .terminal-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
     .terminal-container .xterm { height: 100%%; width: 100%%; }
     .terminal-container .xterm-screen { height: 100%%; }
@@ -530,12 +584,14 @@
     .dv-content-container > .panel { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
     .detail-content { padding: 8px; white-space: pre-wrap; font-family: 'JetBrains Mono', monospace; }
     .inspector-entry { padding: 2px 8px; }
-    .inspector-label { color: #888; }
-    .inspector-value { color: #9cdcfe; }
-    .inspector-link { color: #4fc1ff; cursor: pointer; text-decoration: underline; }
-    .binding-header { color: #dcdcaa; font-weight: bold; }
-    .inspect-link { color: #4fc1ff; cursor: pointer; margin-left: 8px; font-size: 0.9em; }
-    .inspect-link:hover { text-decoration: underline; }
+    .inspector-label { color: var(--fg-muted); }
+    .inspector-value { color: var(--accent); }
+    .inspector-link { color: var(--accent-hover); cursor: pointer; text-decoration: underline; }
+    .binding-header { color: var(--fg-secondary); font-weight: bold; }
+    .inspect-link { color: var(--accent); cursor: pointer; margin-left: 8px; font-size: 0.9em; }
+    .inspect-link:hover { text-decoration: underline; color: var(--accent-hover); }
+    .panel-header button { background: var(--bg-tertiary); border: 1px solid var(--border); color: var(--fg-primary); }
+    .panel-header button:hover { background: var(--accent); color: var(--bg-primary); }
   </style>
 </head>
 <body>
@@ -560,6 +616,8 @@
 
     ws.onopen = () => {
       console.log('Connected');
+      // Send dark mode preference for theme auto-selection
+      sendDarkModePreference();
       ws.send(JSON.stringify({type: 'get-packages'}));
     };
 
@@ -587,8 +645,58 @@
         case 'symbol-clicked':
           handleSymbolClicked(msg);
           break;
+        case 'theme':
+          applyTheme(msg.data);
+          break;
       }
     };
+
+    // Theme application
+    function applyTheme(themeData) {
+      if (!themeData) return;
+      console.log('Applying theme:', themeData.displayName);
+
+      // Apply CSS variables by injecting a style tag
+      let styleEl = document.getElementById('theme-styles');
+      if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'theme-styles';
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = themeData.css;
+
+      // Update body styles using CSS variables
+      document.body.style.background = 'var(--bg-primary)';
+      document.body.style.color = 'var(--fg-primary)';
+
+      // Apply xterm.js theme if terminal exists
+      if (terminal && themeData.xterm) {
+        const xtermTheme = {};
+        Object.entries(themeData.xterm).forEach(([k, v]) => {
+          xtermTheme[k] = v;
+        });
+        terminal.options.theme = xtermTheme;
+      }
+
+      // Apply dockview theme class
+      if (themeData.dockviewTheme && dockviewApi) {
+        const container = document.getElementById('layout-container');
+        container.className = themeData.dockviewTheme;
+      }
+    }
+
+    // Send dark mode preference on connect
+    function sendDarkModePreference() {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      ws.send(JSON.stringify({type: 'dark-mode-preference', dark: isDark}));
+    }
+
+    // Listen for system dark mode changes
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({type: 'dark-mode-preference', dark: e.matches}));
+      }
+    });
 
     function handleSymbolClicked(msg) {
       // Update Packages panel - select the package
@@ -890,7 +998,7 @@
         const contentId = 'content-' + this._panelId;
         this._element.innerHTML = `
           <div class='panel-header' id='${headerId}' style='display:none;'>
-            <button onclick='inspectBack(\"${this._panelId}\")' style='padding:2px 8px;background:#3d3d3d;border:1px solid #4d4d4d;color:#d4d4d4;border-radius:3px;cursor:pointer;'>← Back</button>
+            <button onclick='inspectBack(\"${this._panelId}\")' style='padding:2px 8px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--fg-primary);border-radius:3px;cursor:pointer;'>← Back</button>
           </div>
           <div class='panel-content detail-content' id='${contentId}'>
             Loading...
@@ -930,7 +1038,7 @@
           fitAddon = new FitAddon.FitAddon();
           terminal.loadAddon(fitAddon);
           terminal.open(this._element);
-          fitAddon.fit();
+          // Don't fit immediately - wait for Dockview layout to settle
 
           // Send all input directly to Lisp - the editor handles everything
           terminal.onData(data => {
@@ -969,7 +1077,7 @@
               hoveredSymbol = symbolInfo.symbol;  // Store for click handler
               if (!highlightBox) {
                 highlightBox = document.createElement('div');
-                highlightBox.style.cssText = 'position:absolute;border:1px solid #4fc1ff;border-radius:2px;pointer-events:none;z-index:10;';
+                highlightBox.style.cssText = 'position:absolute;border:1px solid var(--accent);border-radius:2px;pointer-events:none;z-index:10;';
                 termEl.appendChild(highlightBox);
               }
               const cellW = renderer.css.cell.width;
@@ -993,21 +1101,24 @@
             if (terminal) terminal.element.style.cursor = '';
           });
 
-          // Refit on resize and after short delay for initial sizing
+          // Refit on resize
           const doFit = () => { try { fitAddon.fit(); } catch(e) {} };
           new ResizeObserver(doFit).observe(this._element);
-          setTimeout(doFit, 50);
-          setTimeout(doFit, 200);
 
-          // Signal that terminal is ready - this triggers REPL start
-          // Make sure WebSocket is open first
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({type: 'terminal-ready'}));
-          } else {
-            ws.addEventListener('open', () => {
+          // Signal terminal ready after layout has settled
+          const signalReady = () => {
+            doFit();
+            if (ws.readyState === WebSocket.OPEN) {
               ws.send(JSON.stringify({type: 'terminal-ready'}));
-            }, {once: true});
-          }
+            } else {
+              ws.addEventListener('open', () => {
+                ws.send(JSON.stringify({type: 'terminal-ready'}));
+              }, {once: true});
+            }
+          };
+
+          // Wait for Dockview layout to complete before signaling ready
+          setTimeout(signalReady, 300);
         }, 100);
       }
     }
@@ -1017,7 +1128,7 @@
     const dv = window['dockview-core'];
 
     const api = dv.createDockview(container, {
-      className: 'dockview-theme-abyss',
+      className: 'icl-dockview-theme',
       disableAutoResizing: false,
       createComponent: (options) => {
         switch (options.name) {

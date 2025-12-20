@@ -68,4 +68,25 @@
    ;; Browser
    #:start-browser
    #:stop-browser
-   #:*browser-port*))
+   #:*browser-port*
+
+   ;; Theming
+   #:*current-terminal-theme*
+   #:*current-browser-theme*
+   #:*default-dark-terminal-theme*
+   #:*default-light-terminal-theme*
+   #:*default-dark-browser-theme*
+   #:*default-light-browser-theme*
+   #:define-terminal-theme
+   #:define-browser-theme
+   #:set-terminal-theme
+   #:set-browser-theme
+   #:apply-terminal-theme
+   #:apply-browser-theme
+   #:list-terminal-themes
+   #:list-browser-themes
+   #:find-terminal-theme
+   #:find-browser-theme
+   #:auto-select-terminal-theme
+   #:auto-select-browser-theme
+   #:detect-terminal-dark-mode))

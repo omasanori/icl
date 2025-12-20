@@ -122,9 +122,11 @@
   "Start ICL REPL with optional configuration loading.
    LOAD-CONFIG: if T, load ~/.iclrc
    BANNER: if T, print startup banner"
-  ;; Detect terminal background and set up colors
+  ;; Initialize theming system (auto-detects dark/light mode)
+  (initialize-themes)
+  ;; Set up paren match colors based on terminal background
   (setup-highlight-colors)
-  ;; Load user config
+  ;; Load user config (may override theme settings)
   (when load-config
     (load-user-config))
   ;; Note: History is loaded inside run-repl after session is created

@@ -318,3 +318,65 @@
   "AI CLI tool to use for ,explain command.
    Valid values: :claude, :gemini, :codex, or NIL for auto-detect.
    Auto-detection tries claude, gemini, codex in order.")
+
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Color Configuration (256-color codes)
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+;;; Syntax highlighting color codes (0-255)
+(defvar *hl-keyword-color* 37
+  "Color code for keywords (like :foo).")
+(defvar *hl-string-color* 178
+  "Color code for string literals.")
+(defvar *hl-comment-color* 243
+  "Color code for comments.")
+(defvar *hl-number-color* 33
+  "Color code for numeric literals.")
+(defvar *hl-symbol-color* 252
+  "Color code for regular symbols.")
+(defvar *hl-package-color* 75
+  "Color code for package prefixes.")
+(defvar *hl-special-color* 205
+  "Color code for special forms and macros.")
+
+;;; UI color codes
+(defvar *color-prompt* 75
+  "Color code for main prompt.")
+(defvar *color-package* 243
+  "Color code for package name in prompt.")
+(defvar *color-error* 196
+  "Color code for error messages.")
+(defvar *color-warning* 214
+  "Color code for warning messages.")
+(defvar *color-info* 75
+  "Color code for info messages.")
+(defvar *color-dim* 243
+  "Color code for dimmed/secondary text.")
+
+;;; ─────────────────────────────────────────────────────────────────────────────
+;;; ANSI Escape Sequences
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+;;; Common control sequences
+(defvar *ansi-reset* (format nil "~C[0m" #\Escape)
+  "Reset all text attributes.")
+(defvar *ansi-bold* (format nil "~C[1m" #\Escape)
+  "Bold text.")
+(defvar *ansi-dim* (format nil "~C[2m" #\Escape)
+  "Dim text.")
+(defvar *ansi-reverse* (format nil "~C[7m" #\Escape)
+  "Reverse video.")
+
+;;; Color sequences (generated from color codes)
+(defvar *ansi-prompt* (format nil "~C[38;5;75m" #\Escape)
+  "ANSI sequence for prompt color.")
+(defvar *ansi-package* (format nil "~C[38;5;243m" #\Escape)
+  "ANSI sequence for package color.")
+(defvar *ansi-error* (format nil "~C[38;5;196m" #\Escape)
+  "ANSI sequence for error color.")
+(defvar *ansi-warning* (format nil "~C[38;5;214m" #\Escape)
+  "ANSI sequence for warning color.")
+(defvar *ansi-info* (format nil "~C[38;5;75m" #\Escape)
+  "ANSI sequence for info color.")
+(defvar *ansi-fg-gray* (format nil "~C[38;5;245m" #\Escape)
+  "ANSI sequence for gray text.")
