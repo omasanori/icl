@@ -70,6 +70,10 @@
    #:stop-browser
    #:*browser-port*
 
+   ;; Debug logging
+   #:*browser-debug*
+   #:*inspector-debug*
+
    ;; Theming
    #:*current-terminal-theme*
    #:*current-browser-theme*

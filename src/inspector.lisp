@@ -7,6 +7,24 @@
 (in-package #:icl)
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
+;;; Debug Logging
+;;; ─────────────────────────────────────────────────────────────────────────────
+
+(defvar *inspector-debug* nil
+  "When T, enable verbose inspector debug logging.")
+
+(defvar *inspector-log-stream* *error-output*
+  "Stream for inspector debug logging. Set at load time to the real terminal.")
+
+(defun inspector-log (format-string &rest args)
+  "Log a debug message if *inspector-debug* is enabled."
+  (when *inspector-debug*
+    (apply #'format *inspector-log-stream*
+           (concatenate 'string "~&;; [INSPECTOR] " format-string "~%")
+           args)
+    (force-output *inspector-log-stream*)))
+
+;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Inspector State
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
@@ -31,38 +49,84 @@
 (defun slynk-inspect-object (form-string)
   "Inspect an object via Slynk. Returns (values data error-string).
    Uses backend-eval with slynk:init-inspector for thread-safe operation."
+  (inspector-log "slynk-inspect-object called with form-string: ~S" form-string)
   (unless *slynk-connected-p*
+    (inspector-log "slynk-inspect-object: NOT CONNECTED to backend server")
     (return-from slynk-inspect-object (values nil "Not connected to backend server")))
   (handler-case
-      (let* ((code (format nil "(slynk:init-inspector ~S)" form-string))
-             (results (backend-eval code))
-             (result-string (first results))
-             (data (when result-string
-                     (ignore-errors (read-from-string result-string)))))
-        (values data nil))
+      (let* ((code (format nil "(slynk:init-inspector ~S)" form-string)))
+        (inspector-log "slynk-inspect-object: sending code to backend: ~S" code)
+        (let* ((results (backend-eval code))
+               (result-string (first results)))
+          (inspector-log "slynk-inspect-object: backend-eval returned ~D result(s)" (length results))
+          (inspector-log "slynk-inspect-object: result-string length=~A, preview=~S"
+                         (if result-string (length result-string) "nil")
+                         (if result-string (subseq result-string 0 (min 200 (length result-string))) nil))
+          (let ((data (when result-string
+                        (handler-case
+                            (read-from-string result-string)
+                          (error (e)
+                            (inspector-log "slynk-inspect-object: ERROR parsing result: ~A" e)
+                            nil)))))
+            (inspector-log "slynk-inspect-object: parsed data type=~A, keys=~S"
+                           (type-of data)
+                           (when (listp data)
+                             (loop for (k v) on data by #'cddr collect k)))
+            (when data
+              (inspector-log "slynk-inspect-object: :title=~S" (getf data :title))
+              (inspector-log "slynk-inspect-object: :content type=~A length=~A"
+                             (type-of (getf data :content))
+                             (if (listp (getf data :content)) (length (getf data :content)) "N/A")))
+            (values data nil))))
     (error (e)
+      (inspector-log "slynk-inspect-object: EXCEPTION: ~A" e)
       (values nil (princ-to-string e)))))
 
 (defun slynk-inspector-action (index)
   "Perform inspector action (drill down) at INDEX."
+  (inspector-log "slynk-inspector-action called with index: ~D" index)
   (unless *slynk-connected-p*
+    (inspector-log "slynk-inspector-action: NOT CONNECTED")
     (return-from slynk-inspector-action nil))
   (handler-case
-      (let* ((code (format nil "(slynk:inspect-nth-part ~D)" index))
-             (result-string (first (backend-eval code))))
-        (when result-string
-          (ignore-errors (read-from-string result-string))))
-    (error () nil)))
+      (let* ((code (format nil "(slynk:inspect-nth-part ~D)" index)))
+        (inspector-log "slynk-inspector-action: sending code: ~S" code)
+        (let ((result-string (first (backend-eval code))))
+          (inspector-log "slynk-inspector-action: result-string length=~A"
+                         (if result-string (length result-string) "nil"))
+          (when result-string
+            (let ((data (handler-case
+                            (read-from-string result-string)
+                          (error (e)
+                            (inspector-log "slynk-inspector-action: ERROR parsing: ~A" e)
+                            nil))))
+              (inspector-log "slynk-inspector-action: parsed data type=~A" (type-of data))
+              data))))
+    (error (e)
+      (inspector-log "slynk-inspector-action: EXCEPTION: ~A" e)
+      nil)))
 
 (defun slynk-inspector-pop ()
   "Go back in the Slynk inspector."
+  (inspector-log "slynk-inspector-pop called")
   (unless *slynk-connected-p*
+    (inspector-log "slynk-inspector-pop: NOT CONNECTED")
     (return-from slynk-inspector-pop nil))
   (handler-case
       (let ((result-string (first (backend-eval "(slynk:inspector-pop)"))))
+        (inspector-log "slynk-inspector-pop: result-string length=~A"
+                       (if result-string (length result-string) "nil"))
         (when result-string
-          (ignore-errors (read-from-string result-string))))
-    (error () nil)))
+          (let ((data (handler-case
+                          (read-from-string result-string)
+                        (error (e)
+                          (inspector-log "slynk-inspector-pop: ERROR parsing: ~A" e)
+                          nil))))
+            (inspector-log "slynk-inspector-pop: parsed data type=~A" (type-of data))
+            data)))
+    (error (e)
+      (inspector-log "slynk-inspector-pop: EXCEPTION: ~A" e)
+      nil)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Parse Slynk Inspector Content
@@ -84,19 +148,33 @@
   "Parse Slynk inspector content into a list of entries.
    Each entry is (label value-string action-index) where action-index
    may be NIL for non-drillable items."
+  (inspector-log "parse-inspector-content: input type=~A, length=~A"
+                 (type-of content)
+                 (if (listp content) (length content) "N/A"))
+  (inspector-log "parse-inspector-content: first 5 items: ~S"
+                 (if (listp content) (subseq content 0 (min 5 (length content))) content))
   (let ((entries nil)
         (current-label nil)
         (current-value nil)
-        (current-action nil))
+        (current-action nil)
+        (item-count 0))
     (dolist (item content)
+      (incf item-count)
+      (when (< item-count 20)  ; Log first 20 items in detail
+        (inspector-log "parse-inspector-content: item[~D] type=~A value=~S"
+                       item-count (type-of item)
+                       (if (stringp item)
+                           (subseq item 0 (min 50 (length item)))
+                           item)))
       (cond
         ;; Newline string - end of current entry
         ((newline-string-p item)
          (when (or current-label current-value)
-           (push (list (string-trim '(#\Space #\Tab #\: ) (ensure-string current-label))
-                       (string-trim '(#\Space #\Tab) (ensure-string current-value))
-                       current-action)
-                 entries))
+           (let ((entry (list (string-trim '(#\Space #\Tab #\: ) (ensure-string current-label))
+                              (string-trim '(#\Space #\Tab) (ensure-string current-value))
+                              current-action)))
+             (inspector-log "parse-inspector-content: pushing entry: ~S" entry)
+             (push entry entries)))
          (setf current-label nil
                current-value nil
                current-action nil))
@@ -109,20 +187,34 @@
                  (setf current-label item))))
         ;; (:value "string" action-id) - a drillable value
         ((and (listp item) (eql (first item) :value))
+         (inspector-log "parse-inspector-content: found :value item, second=~S third=~S"
+                        (second item) (third item))
          (setf current-value (ensure-string (second item)))
          (when (third item)
            (setf current-action (third item))))
         ;; (:action "label" action-id) - an action button
         ((and (listp item) (eql (first item) :action))
+         (inspector-log "parse-inspector-content: found :action item, second=~S third=~S"
+                        (second item) (third item))
          (setf current-label (ensure-string (second item)))
-         (setf current-action (third item)))))
+         (setf current-action (third item)))
+        ;; Unknown item type
+        (t
+         (inspector-log "parse-inspector-content: UNKNOWN item type: ~A value=~S"
+                        (type-of item) item))))
     ;; Don't forget last entry if no trailing newline
     (when (or current-label current-value)
-      (push (list (string-trim '(#\Space #\Tab #\:) (ensure-string current-label))
-                  (string-trim '(#\Space #\Tab) (ensure-string current-value))
-                  current-action)
-            entries))
-    (nreverse entries)))
+      (let ((entry (list (string-trim '(#\Space #\Tab #\:) (ensure-string current-label))
+                         (string-trim '(#\Space #\Tab) (ensure-string current-value))
+                         current-action)))
+        (inspector-log "parse-inspector-content: pushing final entry: ~S" entry)
+        (push entry entries)))
+    (let ((result (nreverse entries)))
+      (inspector-log "parse-inspector-content: returning ~D entries" (length result))
+      (when (plusp (length result))
+        (inspector-log "parse-inspector-content: first entry: ~S" (first result))
+        (inspector-log "parse-inspector-content: last entry: ~S" (car (last result))))
+      result)))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Inspector Rendering
