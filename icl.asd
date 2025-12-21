@@ -8,7 +8,7 @@
   :description "Interactive Common Lisp: An enhanced REPL"
   :author      "Anthony Green <green@moxielogic.com>"
   :license     "MIT"
-  :version     "1.9.3"
+  :version     "1.10.0"
   :depends-on (:clingon
                :version-string
                ;; Input/Terminal
