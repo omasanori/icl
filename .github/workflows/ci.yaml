@@ -136,13 +136,13 @@ jobs:
       - name: Test browser server (Linux)
         if: runner.os == 'Linux'
         run: |
-          output=$(printf ',browse test\n,quit\n' | timeout 30s ./${{ matrix.binary }} 2>&1)
+          output=$(printf ',browser test\n,quit\n' | timeout 30s ./${{ matrix.binary }} 2>&1)
           echo "$output"
           echo "$output" | grep -q "Browser test passed" || (echo "FAIL: Browser test did not pass" && exit 1)
 
       - name: Test browser server (macOS)
         if: runner.os == 'macOS'
         run: |
-          output=$(printf ',browse test\n,quit\n' | gtimeout 30s ./${{ matrix.binary }} 2>&1)
+          output=$(printf ',browser test\n,quit\n' | gtimeout 30s ./${{ matrix.binary }} 2>&1)
           echo "$output"
           echo "$output" | grep -q "Browser test passed" || (echo "FAIL: Browser test did not pass" && exit 1)
