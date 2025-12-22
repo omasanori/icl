@@ -2532,6 +2532,41 @@
         }
       } catch(e) { console.log('Layout resize:', e); }
     }, 300);
+
+    // Double-click on tab to maximize/restore panel
+    document.addEventListener('dblclick', (e) => {
+      const tab = e.target.closest('.dv-tab');
+      if (tab) {
+        const activePanel = api.activePanel;
+        if (activePanel) {
+          if (activePanel.api.isMaximized()) {
+            activePanel.api.exitMaximized();
+          } else {
+            activePanel.api.maximize();
+          }
+        }
+      }
+    });
+
+    // Keyboard shortcut: F11 or Escape to maximize/restore active panel
+    document.addEventListener('keydown', (e) => {
+      // F11 to toggle maximize (prevent default fullscreen)
+      if (e.key === 'F11') {
+        e.preventDefault();
+        const activePanel = api.activePanel;
+        if (activePanel) {
+          if (activePanel.api.isMaximized()) {
+            activePanel.api.exitMaximized();
+          } else {
+            activePanel.api.maximize();
+          }
+        }
+      }
+      // Escape to exit maximized state
+      if (e.key === 'Escape' && api.hasMaximizedGroup()) {
+        api.exitMaximizedGroup();
+      }
+    });
   </script>
 </body>
 </html>" *browser-token*))
