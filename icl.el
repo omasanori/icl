@@ -76,16 +76,28 @@
     ('sly (sly-eval form))
     ('slime (slime-eval form))))
 
-(defun icl--ensure-slynk-and-create-server ()
-  "Ensure Slynk is available in the Lisp image and create a server."
-  (icl--eval
-   '(cl:progn
-      (cl:when (cl:not (cl:find-package :slynk))
-        (cl:handler-case
-            (asdf:load-system :slynk)
-          (error (e)
-            (error "Failed to load Slynk: ~A" e))))
-      (slynk:create-server :port 0 :dont-close t))))
+(defun icl--ensure-server-and-create ()
+  "Ensure Slynk/Swank is available in the Lisp image and create a server.
+Uses Slynk for SLY backend, Swank for SLIME backend."
+  (pcase (icl--backend)
+    ('sly
+     (icl--eval
+      '(cl:progn
+         (cl:when (cl:not (cl:find-package :slynk))
+           (cl:handler-case
+               (asdf:load-system :slynk)
+             (error (e)
+               (error "Failed to load Slynk: ~A" e))))
+         (slynk:create-server :port 0 :dont-close t))))
+    ('slime
+     (icl--eval
+      '(cl:progn
+         (cl:when (cl:not (cl:find-package :swank))
+           (cl:handler-case
+               (asdf:load-system :swank)
+             (error (e)
+               (error "Failed to load Swank: ~A" e))))
+         (swank:create-server :port 0 :dont-close t))))))
 
 (defun icl--on-sly-disconnect (&rest _)
   "Stop ICL shortly after the connection disconnects."
@@ -176,8 +188,8 @@ Uses icl-runtime package with wrappers around REPL eval functions
   (icl--maybe-install-sly-hooks)
   ;; Set up eval generation counter for visualization refresh
   (icl--setup-eval-hook)
-  ;; Create a Slynk server that accepts connections
-  (let ((port (icl--ensure-slynk-and-create-server)))
+  ;; Create a Slynk/Swank server that accepts connections
+  (let ((port (icl--ensure-server-and-create)))
     (setq icl--slynk-port port)
     (message "ICL connecting on port %d" port)
     (start-process "icl" "*icl*" icl-program
