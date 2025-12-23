@@ -477,9 +477,6 @@
 
 (defun ensure-backend ()
   "Ensure a Lisp backend is available via Slynk."
-  (when *verbose*
-    (format t "~&; ensure-backend: *slynk-connected-p*=~A inferior-alive=~A external=~A~%"
-            *slynk-connected-p* (inferior-lisp-alive-p) *external-slynk-connection*))
   (when (not *slynk-connected-p*)
     ;; For external connections, don't try to spawn a new process
     (when *external-slynk-connection*
@@ -491,9 +488,17 @@
 
 (defun backend-eval (string)
   "Evaluate STRING using the Slynk backend.
-   Output streams to terminal. Returns result values."
+   Output streams to terminal. Returns result values.
+   Updates REPL history variables (*, **, ***, etc.)."
   (ensure-backend)
   (slynk-eval-form string))
+
+(defun backend-eval-internal (string)
+  "Evaluate STRING using the Slynk backend for internal ICL operations.
+   Output streams to terminal. Returns result values.
+   Does NOT update REPL history variables (*, **, ***, etc.)."
+  (ensure-backend)
+  (slynk-eval-form-internal string))
 
 (defun backend-eval-capture (string)
   "Evaluate STRING using the Slynk backend capturing stdout/stderr.

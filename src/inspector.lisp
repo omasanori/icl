@@ -56,7 +56,7 @@
   (handler-case
       (let* ((code (format nil "(slynk:init-inspector ~S)" form-string)))
         (inspector-log "slynk-inspect-object: sending code to backend: ~S" code)
-        (let* ((results (backend-eval code))
+        (let* ((results (backend-eval-internal code))
                (result-string (first results)))
           (inspector-log "slynk-inspect-object: backend-eval returned ~D result(s)" (length results))
           (inspector-log "slynk-inspect-object: result-string length=~A, preview=~S"
@@ -91,7 +91,7 @@
   (handler-case
       (let* ((code (format nil "(slynk:inspect-nth-part ~D)" index)))
         (inspector-log "slynk-inspector-action: sending code: ~S" code)
-        (let ((result-string (first (backend-eval code))))
+        (let ((result-string (first (backend-eval-internal code))))
           (inspector-log "slynk-inspector-action: result-string length=~A"
                          (if result-string (length result-string) "nil"))
           (when result-string
@@ -113,7 +113,7 @@
     (inspector-log "slynk-inspector-pop: NOT CONNECTED")
     (return-from slynk-inspector-pop nil))
   (handler-case
-      (let ((result-string (first (backend-eval "(slynk:inspector-pop)"))))
+      (let ((result-string (first (backend-eval-internal "(slynk:inspector-pop)"))))
         (inspector-log "slynk-inspector-pop: result-string length=~A"
                        (if result-string (length result-string) "nil"))
         (when result-string

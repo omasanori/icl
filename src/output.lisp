@@ -266,8 +266,8 @@
   (format t "icl ~A" +version+)
   ;; Get version from inferior Lisp
   (handler-case
-      (let ((impl-type (first (backend-eval "(lisp-implementation-type)")))
-            (impl-version (first (backend-eval "(lisp-implementation-version)"))))
+      (let ((impl-type (first (backend-eval-internal "(lisp-implementation-type)")))
+            (impl-version (first (backend-eval-internal "(lisp-implementation-version)"))))
         (format t " (~A ~A)" impl-type impl-version))
     (error () nil))
   (when *paredit-mode*

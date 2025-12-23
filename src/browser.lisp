@@ -43,18 +43,25 @@
 (defvar *browser-path* nil
   "Random path prefix for the browser (e.g., /icl/abc123).")
 
+(defvar *eval-generation-poller* nil
+  "Thread that polls for external eval generation changes.")
+
+(defvar *last-eval-generation* -1
+  "Last seen eval generation from external Lisp.")
+
 ;;; ─────────────────────────────────────────────────────────────────────────────
 ;;; Backend Query Helpers
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
 (defun browser-query (code)
   "Execute CODE in the backend and return parsed result.
+   Preserves REPL history variables (*, **, ***, etc.).
    Returns nil on error."
   (browser-log "browser-query: code length=~D code-preview=~S"
                (length code)
                (subseq code 0 (min 100 (length code))))
   (handler-case
-      (let ((result-string (first (backend-eval code))))
+      (let ((result-string (first (backend-eval-internal code))))
         (browser-log "browser-query: result-string length=~A preview=~S"
                      (if result-string (length result-string) "NIL")
                      (when result-string
@@ -3223,6 +3230,11 @@
 
   ;; REPL thread will be started when first client connects
 
+  ;; Start eval generation poller for external connections
+  ;; This refreshes visualizations when Emacs/Sly evaluates expressions
+  (when *external-slynk-connection*
+    (start-eval-generation-poller))
+
   (let ((url (format nil "http://127.0.0.1:~A~A" port *browser-path*)))
     (when open-browser
       (ignore-errors (uiop:run-program (list "xdg-open" url))))
@@ -3230,6 +3242,8 @@
 
 (defun stop-browser ()
   "Stop the Dockview browser."
+  ;; Stop the eval generation poller if running
+  (stop-eval-generation-poller)
   (when *browser-acceptor*
     ;; Signal the browser-repl thread to exit by sending nil (EOF) to input queue
     (when *repl-resource*
@@ -3240,6 +3254,50 @@
     (setf *browser-acceptor* nil)
     (setf *repl-resource* nil)
     t))
+
+(defun start-eval-generation-poller ()
+  "Start polling for eval generation changes from external Lisp.
+   Used when connected to an external Slynk server (via --connect)
+   to refresh visualizations when Emacs/Sly evaluates expressions."
+  (when *eval-generation-poller*
+    (stop-eval-generation-poller))
+  (setf *last-eval-generation* -1)
+  (setf *eval-generation-poller*
+        (bt:make-thread
+         (lambda ()
+           (loop
+             (sleep 1)
+             (handler-case
+                 ;; Use with-slynk-connection for proper locking
+                 (let ((gen (ignore-errors
+                              (with-slynk-connection
+                                (slynk-client:slime-eval
+                                 '(cl:if (cl:boundp (cl:quote cl-user::*icl-eval-generation*))
+                                         (cl:symbol-value (cl:quote cl-user::*icl-eval-generation*))
+                                         0)
+                                 *slynk-connection*)))))
+                   ;; DEBUG
+                   (format *error-output* "~&; POLLER: gen=~S last=~S~%" gen *last-eval-generation*)
+                   (force-output *error-output*)
+                   (when (and gen (numberp gen) (/= gen *last-eval-generation*))
+                     (format *error-output* "~&; POLLER: Refreshing visualizations!~%")
+                     (setf *last-eval-generation* gen)
+                     ;; Don't refresh on first poll (gen was -1)
+                     (when (>= *last-eval-generation* 0)
+                       (refresh-browser-visualizations))))
+               (error (e)
+                 (format *error-output* "~&; POLLER error: ~A~%" e)))
+             ;; Exit if browser stopped
+             (unless *browser-acceptor*
+               (return))))
+         :name "icl-eval-generation-poller")))
+
+(defun stop-eval-generation-poller ()
+  "Stop the eval generation poller thread."
+  (when *eval-generation-poller*
+    (ignore-errors
+      (bt:destroy-thread *eval-generation-poller*))
+    (setf *eval-generation-poller* nil)))
 
 (defun start-browser-repl-thread ()
   "Start the REPL thread that processes input from WebSocket.

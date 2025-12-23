@@ -169,7 +169,7 @@
                                   (error (e) (format nil \"Error: ~~A\" e)))"
                                (string-upcase symbol-name)
                                type-str type-str))))
-        (let ((result (first (backend-eval code))))
+        (let ((result (first (backend-eval-internal code))))
           (or result "No documentation available.")))
     (error (e)
       (format nil "Error: ~A" e))))
@@ -187,7 +187,7 @@
                                     \"Not a symbol.\"))
                               (error (e) (format nil \"Error: ~~A\" e)))"
                            (string-upcase symbol-name))))
-        (let ((result (first (backend-eval code))))
+        (let ((result (first (backend-eval-internal code))))
           (or result "Symbol not found or no description available.")))
     (error (e)
       (format nil "Error: ~A" e))))
@@ -199,7 +199,7 @@
                            "(with-output-to-string (*standard-output*)
                               (apropos ~S))"
                            pattern)))
-        (let ((result (first (backend-eval code))))
+        (let ((result (first (backend-eval-internal code))))
           (if (and result (> (length result) 0))
               result
               "No matching symbols found.")))
@@ -218,7 +218,7 @@
                                     (format nil \"~~{~~A~~^~~%~~}\" (sort syms #'string<)))
                                   \"Package not found.\"))"
                            (string-upcase package-name))))
-        (let ((result (first (backend-eval code))))
+        (let ((result (first (backend-eval-internal code))))
           (or result "No symbols found.")))
     (error (e)
       (format nil "Error: ~A" e))))
@@ -236,7 +236,7 @@
                               (error (e) (format nil \"Error: ~~A\" e)))"
                            (string-upcase function-name)
                            (string-upcase function-name))))
-        (let ((result (first (backend-eval code))))
+        (let ((result (first (backend-eval-internal code))))
           (or result "Could not get arglist.")))
     (error (e)
       (format nil "Error: ~A" e))))

@@ -163,7 +163,63 @@
                (otherwise result)))))
       (slynk-client:slime-network-error (e)
         (setf *slynk-connected-p* nil)
-      (error "Backend connection lost: ~A" e)))))
+        (error "Backend connection lost: ~A" e)))))
+
+(defun slynk-eval-form-internal (string &key (package "CL-USER"))
+  "Evaluate STRING for internal ICL operations without updating REPL history.
+   Same as slynk-eval-form but does not modify *, **, ***, etc."
+  (declare (ignore package))
+  (unless *slynk-connected-p*
+    (error "Not connected to backend server"))
+  ;; Same wrapper as slynk-eval-form but WITHOUT the setf for history variables
+  (let ((wrapper-code (format nil "(handler-case
+  (let ((vals (multiple-value-list (eval (read-from-string ~S)))))
+    (force-output)
+    (list :ok nil (mapcar (lambda (v) (write-to-string v :readably nil :pretty nil)) vals)))
+  (error (err)
+    (list :error
+          (let ((msg (princ-to-string err)))
+            (string-right-trim '(#\\Newline #\\Space)
+              (with-output-to-string (s)
+                (with-input-from-string (in msg)
+                  (loop for line = (read-line in nil nil)
+                        while line
+                        unless (and (> (length line) 2)
+                                    (char= (char line 0) #\\Space)
+                                    (char= (char line 1) #\\Space)
+                                    (search \"Stream:\" line))
+                        do (write-line line s))))))
+          (ignore-errors
+            (slynk:backtrace 0 30)))))" string)))
+    (handler-case
+        (let ((result (with-slynk-connection
+                        (slynk-client:slime-eval
+                         `(cl:eval
+                           (cl:let ((cl:*package* (cl:find-package "CL-USER")))
+                             (cl:read-from-string ,wrapper-code)))
+                         *slynk-connection*))))
+          (cond
+            ((not (consp result))
+             (let ((output (princ-to-string result)))
+               (when (and output (> (length output) 0))
+                 (write-string output)
+                 (force-output))
+               nil))
+            (t
+             (case (first result)
+               (:ok
+                (let ((output (second result))
+                      (vals (third result)))
+                  (when (and output (> (length output) 0))
+                    (write-string output)
+                    (force-output))
+                  vals))
+               (:error
+                (error "~A" (second result)))
+               (otherwise result)))))
+      (slynk-client:slime-network-error (e)
+        (setf *slynk-connected-p* nil)
+        (error "Backend connection lost: ~A" e)))))
 
 (defun slynk-eval-form-capturing (string &key (package "CL-USER"))
   "Evaluate STRING but keep all stdout/stderr in a string.

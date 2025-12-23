@@ -482,7 +482,7 @@ Example: ,inspect-static *package*"
 Example: ,slots (find-class 'standard-class)
 Example: ,slots *package*"
   (handler-case
-      (let ((value (first (backend-eval expr-string))))
+      (let ((value (first (backend-eval-internal expr-string))))
         (if (typep value 'standard-object)
             (show-object-slots value)
             (format *error-output* "~&Not a standard-object: ~S~%" value)))
@@ -1241,7 +1241,7 @@ Examples:
                                                 collect (princ-to-string m)))))
                                  (t (list :unknown (type-of obj) (princ-to-string obj)))))"
                         trimmed))
-         (result (backend-eval query)))
+         (result (backend-eval-internal query)))
     (when (and result (listp result) (first result))
       (let ((parsed (read-from-string (first result))))
         (case (first parsed)
@@ -1283,7 +1283,7 @@ Examples:
                                          (list :fset-venn ~D members))
                                        (list :not-sets)))"
                             expressions set-count))
-             (result (backend-eval query)))
+             (result (backend-eval-internal query)))
         (when (and result (listp result) (first result))
           (let ((parsed (read-from-string (first result))))
             (case (first parsed)
@@ -1430,7 +1430,7 @@ Example: ,ql cl-ppcre"
               (error \"No system loader available (ocicl, Quicklisp, or ASDF)\"))))))
   (try-load)
   (values))" name)))
-    (backend-eval loader-code)
+    (backend-eval-internal loader-code)
     nil))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────
@@ -1883,7 +1883,7 @@ Example: ,theme                    - Show current themes
   (let ((base (format nil "Context: ~A ~A~@[, Slynk connected to ~A~]"
                       (or *current-lisp* "Unknown Lisp")
                       (or (ignore-errors
-                            (first (backend-eval "(lisp-implementation-version)")))
+                            (first (backend-eval-internal "(lisp-implementation-version)")))
                           "")
                       (when *slynk-connected-p*
                         (format nil "~A:~D" *slynk-host* *slynk-port*)))))

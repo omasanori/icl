@@ -22,7 +22,7 @@ SAMPLE-INTERVAL is the sampling interval in seconds (default 0.001)."
   (unless *slynk-connected-p*
     (error "Not connected to backend"))
   ;; First, ensure sb-sprof is loaded in the backend
-  (backend-eval "(require 'sb-sprof)")
+  (backend-eval-internal "(require 'sb-sprof)")
   ;; Now send profiling code - sb-sprof package exists so symbols can be read
   ;; This follows cl-flamegraph's approach with proper name extraction.
   ;; We run the profiled code in a separate thread to isolate profiler signals
@@ -98,7 +98,7 @@ SAMPLE-INTERVAL is the sampling interval in seconds (default 0.001)."
                                                 node)))
                               (walk root nil)))))))"
                    mode sample-interval form-string))
-         (results (backend-eval profile-code)))
+         (results (backend-eval-internal profile-code)))
     (if results
         (first results)
         "")))

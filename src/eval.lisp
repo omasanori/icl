@@ -86,6 +86,8 @@
 (defun eval-and-print (input)
   "Parse, evaluate, and print results from INPUT string.
    Handles all errors gracefully. Uses Slynk backend for evaluation."
+  ;; Brief yield - fixes timing issue with external slynk connections
+  (sleep 0.01)
   ;; Track which session is evaluating for output routing
   (bt:with-lock-held (*evaluating-session-lock*)
     (setf *evaluating-session* *current-session*))
