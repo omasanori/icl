@@ -33,6 +33,7 @@
     <Feature Id="ProductFeature" Title="ICL" Level="1">
       <ComponentGroupRef Id="ProductComponents" />
       <ComponentGroupRef Id="AsdfComponents" />
+      <ComponentGroupRef Id="EmacsComponents" />
       <ComponentGroupRef Id="EnvironmentComponents" />
     </Feature>
 
@@ -48,6 +49,13 @@
       <Directory Id="INSTALLFOLDER" Name="ICL">
         <Directory Id="ThirdPartyDir" Name="3rd-party">
           <Directory Id="AsdfDir" Name="asdf" />
+        </Directory>
+        <Directory Id="ShareDir" Name="share">
+          <Directory Id="EmacsDir" Name="emacs">
+            <Directory Id="SiteLispDir" Name="site-lisp">
+              <Directory Id="IclElDir" Name="icl" />
+            </Directory>
+          </Directory>
         </Directory>
       </Directory>
     </StandardDirectory>
@@ -75,6 +83,14 @@
     <ComponentGroup Id="AsdfComponents" Directory="AsdfDir">
       <Component Id="AsdfFile" Guid="F6A7B8C9-D0E1-2345-ABCD-567890123456">
         <File Id="asdf.lisp" Source="$(SourceDir)\3rd-party\asdf\asdf.lisp" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+    <ComponentGroup Id="EmacsComponents" Directory="IclElDir">
+      <Component Id="IclElFile" Guid="E1F2A3B4-C5D6-7890-ABCD-1234567890AB">
+        <File Id="icl.el" Source="$(SourceDir)\icl.el" KeyPath="yes" />
+      </Component>
+      <Component Id="IclAutoloadsFile" Guid="F2A3B4C5-D6E7-8901-BCDE-2345678901BC">
+        <File Id="icl-autoloads.el" Source="$(SourceDir)\icl-autoloads.el" />
       </Component>
     </ComponentGroup>
   </Fragment>

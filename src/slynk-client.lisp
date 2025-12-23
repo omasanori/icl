@@ -34,10 +34,14 @@
 ;;; Connection Management
 ;;; ─────────────────────────────────────────────────────────────────────────────
 
+(defvar *icl-runtime-injected* nil
+  "T when ICL runtime has been injected into the inferior Lisp.")
+
 (defun slynk-connect (&key (host *slynk-host*) (port *slynk-port*))
   "Connect to a backend server at HOST:PORT."
   (when *slynk-connection*
     (slynk-disconnect))
+  (setf *icl-runtime-injected* nil)
   (handler-case
       (let ((conn (slynk-client:slime-connect host port)))
         (when conn
@@ -48,6 +52,99 @@
       (setf *slynk-connected-p* nil)
       (format *error-output* "~&; Failed to connect to Slynk: ~A~%" e)
       nil)))
+
+;; ICL Runtime - Phase 1: Create package
+(defvar *icl-runtime-phase1*
+  "(cl:progn
+     (cl:unless (cl:find-package :icl-runtime)
+       (cl:defpackage #:icl-runtime
+         (:use #:cl)
+         (:export #:usb8-array-to-base64-string
+                  #:*eval-generation*
+                  #:setup-eval-generation-hook)))
+     t)"
+  "Phase 1: Create the ICL runtime package.")
+
+;; ICL Runtime - Phase 2: Define functions (load as a file)
+;; Using LOAD with a string stream ensures proper top-level processing
+(defvar *icl-runtime-phase2*
+  "(in-package :icl-runtime)
+   ;; Base64 encoding
+   (defparameter *base64-chars*
+     \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/\")
+   (defun usb8-array-to-base64-string (bytes)
+     (let* ((len (length bytes))
+            (pad (mod (- 3 (mod len 3)) 3))
+            (out (make-array (* 4 (ceiling (+ len pad) 3))
+                             :element-type 'character
+                             :fill-pointer 0)))
+       (labels ((emit (idx)
+                  (vector-push (char *base64-chars* idx) out))
+                (byte-at (i)
+                  (if (< i len) (aref bytes i) 0)))
+         (loop for i from 0 below len by 3
+               for b0 = (byte-at i)
+               for b1 = (byte-at (+ i 1))
+               for b2 = (byte-at (+ i 2))
+               do (emit (ash b0 -2))
+                  (emit (logior (ash (logand b0 #x03) 4)
+                                (ash b1 -4)))
+                  (emit (logior (ash (logand b1 #x0F) 2)
+                                (ash b2 -6)))
+                  (emit (logand b2 #x3F))))
+       (when (> pad 0)
+         (setf (char out (- (length out) 1)) #\\=))
+       (when (> pad 1)
+         (setf (char out (- (length out) 2)) #\\=))
+       out))
+   ;; Eval generation tracking - only for real REPL activity
+   (defvar *eval-generation* 0)
+   (defvar *eval-hook-installed* nil)
+   (defvar *original-mrepl-eval* nil)
+   (defvar *original-listener-eval* nil)
+   (defun setup-eval-generation-hook ()
+     (unless *eval-hook-installed*
+       ;; SLY uses slynk-mrepl::mrepl-eval for REPL evaluations
+       (when (find-package :slynk-mrepl)
+         (let ((fn-symbol (find-symbol \"MREPL-EVAL\" :slynk-mrepl)))
+           (when (and fn-symbol (fboundp fn-symbol))
+             (setf *original-mrepl-eval* (fdefinition fn-symbol))
+             (setf (fdefinition fn-symbol)
+                   (lambda (repl string)
+                     (prog1 (funcall *original-mrepl-eval* repl string)
+                       (incf *eval-generation*)))))))
+       ;; SLIME uses swank::listener-eval for REPL evaluations
+       (when (find-package :swank)
+         (let ((fn-symbol (find-symbol \"LISTENER-EVAL\" :swank)))
+           (when (and fn-symbol (fboundp fn-symbol))
+             (setf *original-listener-eval* (fdefinition fn-symbol))
+             (setf (fdefinition fn-symbol)
+                   (lambda (string)
+                     (prog1 (funcall *original-listener-eval* string)
+                       (incf *eval-generation*)))))))
+       (setf *eval-hook-installed* t))
+     t)"
+  "Phase 2: Define ICL runtime functions.")
+
+(defun inject-icl-runtime ()
+  "Inject the ICL runtime package into the connected inferior Lisp."
+  (when *slynk-connected-p*
+    (handler-case
+        (progn
+          ;; Phase 1: Create the package
+          (slynk-client:slime-eval
+           (read-from-string *icl-runtime-phase1*)
+           *slynk-connection*)
+          ;; Phase 2: Load definitions using string stream
+          ;; LOAD processes each form as a top-level form, so defvar/defun work correctly
+          ;; Use CL-USER:: for the stream variable to avoid ICL package references
+          (slynk-client:slime-eval
+           `(cl:with-input-from-string (cl-user::icl-load-stream ,*icl-runtime-phase2*)
+              (cl:load cl-user::icl-load-stream)
+              t)
+           *slynk-connection*))
+      (error (e)
+        (format *error-output* "~&; Warning: Failed to inject ICL runtime: ~A~%" e)))))
 
 (defun slynk-disconnect ()
   "Disconnect from the current backend server."

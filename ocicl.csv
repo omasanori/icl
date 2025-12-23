@@ -1,6 +1,7 @@
 add-two, ghcr.io/ocicl/whereiseveryone.command-line-args@sha256:d97e124015dd4ea18058410331856b475bffe39e63144fd1e478c7f954117e22, whereiseveryone.command-line-args-20251028-ff21547e/examples/add-two/add-two.asd
 alexandria, ghcr.io/ocicl/alexandria@sha256:e433c2e076ed3bcf8641b97b00192680db2201d305efac9293539dee88c7fbf7, alexandria-20240503-8514d8e/alexandria.asd
 anaphora, ghcr.io/ocicl/anaphora@sha256:55f1c61b7826c5451a60b4b4522e35e770504bbfa2036d8becbf21f6d654925a, anaphora-20240503-bcf0f74/anaphora.asd
+asdf-package-system, ghcr.io/ocicl/asdf-package-system@sha256:dfacc260786f4e9e2aa13a797a7b326b58e08ea5db778421a9985b9c67362df1, asdf-package-system-20240503-61776f2/asdf-package-system.asd
 atomics, ghcr.io/ocicl/atomics@sha256:ae5daa72b09318c1b07aca6203411181d8bed4382596b27f64d718968131f3a4, atomics-20250813-bf0e261/atomics.asd
 atomics-test, ghcr.io/ocicl/atomics@sha256:ae5daa72b09318c1b07aca6203411181d8bed4382596b27f64d718968131f3a4, atomics-20250813-bf0e261/atomics-test.asd
 autoload, ghcr.io/ocicl/mgl-pax@sha256:170409783f1dee612a5f193e6f65059287c3fa017d049df6ac048bae1e318c62, mgl-pax-20251022-c1c1edb/autoload/autoload.asd

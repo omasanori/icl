@@ -51,6 +51,11 @@ echo "%{_libdir}/icl" > %{buildroot}%{_sysconfdir}/ld.so.conf.d/icl.conf
 mkdir -p %{buildroot}%{_datadir}/icl/asdf
 cp 3rd-party/asdf/asdf.lisp %{buildroot}%{_datadir}/icl/asdf/
 
+# Install Emacs integration
+mkdir -p %{buildroot}%{_datadir}/emacs/site-lisp/icl
+install -m 0644 icl.el %{buildroot}%{_datadir}/emacs/site-lisp/icl/
+install -m 0644 icl-autoloads.el %{buildroot}%{_datadir}/emacs/site-lisp/icl/
+
 # Note: Slynk and browser assets are now embedded in the binary
 
 # Install web asset licenses (JS/CSS libraries)
@@ -72,6 +77,7 @@ install -D -m 0644 THIRD-PARTY-LICENSES.txt %{buildroot}%{_datadir}/licenses/%{n
 %doc README.md
 %{_sysconfdir}/ld.so.conf.d/icl.conf
 %{_datadir}/icl/asdf
+%{_datadir}/emacs/site-lisp/icl
 %{_libdir}/icl
 %{_bindir}/icl
 

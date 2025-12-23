@@ -89,6 +89,45 @@ Start with browser interface (opens IDE alongside terminal REPL):
 icl -b
 ```
 
+## Emacs Integration
+
+ICL ships an Emacs helper for SLY or SLIME that launches the browser REPL and
+syncs visualizations with evals.
+
+Minimal setup (adjust the path for your install):
+```elisp
+(add-to-list 'load-path "/path/to/icl")
+(require 'icl)
+```
+
+Commands:
+- `M-x icl` — start ICL browser connected to the current SLY/SLIME session
+- `M-x icl-stop` — stop the ICL process
+- `M-x icl-restart` — restart ICL
+
+If you have both SLY and SLIME installed, ICL prefers SLY by default.
+You can override this:
+```elisp
+(setq icl-backend 'slime)  ;; or 'sly or 'auto
+```
+
+If you install the package via RPM/DEB/Windows installer, the Emacs
+files are placed in a standard site-lisp directory and you can just
+`(require 'icl)`.
+
+### Packaging Notes (RPM/DEB/Windows)
+
+Suggested install locations for Emacs files:
+- RPM: `%{_datadir}/emacs/site-lisp/icl/icl.el` and `icl-autoloads.el`
+- DEB: `/usr/share/emacs/site-lisp/icl/icl.el` and `icl-autoloads.el`
+- Windows: `<INSTALL>/share/emacs/site-lisp/icl/icl.el` and `icl-autoloads.el`
+
+For packaging, include `icl-autoloads.el` and add the site-lisp path to
+Emacs’ `load-path` (via site-start.d or the installer), then users can:
+```elisp
+(require 'icl)
+```
+
 ## Commands
 
 Commands are prefixed with a comma. Type `,help` for a full list.
@@ -185,12 +224,16 @@ The `,flame` command (aliases: `,flamegraph`, `,fg`) profiles the expression and
 | Command | Description |
 |---------|-------------|
 | `,browser` | Start browser-based IDE interface |
-| `,viz <expr>` | Visualize data in browser (class hierarchies, hash-tables, FSet sets) |
+| `,viz <expr>` | Visualize data in browser (class hierarchies, hash-tables, images, JSON, and more) |
 
 The `,viz` command automatically detects the type and displays an appropriate visualization:
 - **Class names**: `'standard-object` → interactive class hierarchy graph with slots
 - **Hash-tables**: `*my-ht*` → key-value table
-- **FSet sets**: `*my-set*` → circle with members listed inside
+- **FSet collections**: sets, maps, and bags with appropriate displays
+- **JSON strings**: `"{\"key\": \"value\"}"` → syntax-highlighted, pretty-printed JSON
+- **Image byte arrays**: PNG, JPEG, GIF, WebP data → displayed inline
+- **SVG strings**: `"<svg>...</svg>"` → rendered SVG graphics
+- **HTML strings**: `"<!DOCTYPE html>..."` → rendered in sandboxed iframe
 
 #### Venn Diagrams for FSet Sets
 
@@ -214,6 +257,29 @@ The class hierarchy graph supports interactive exploration:
 - **Click a node** to see available subclasses and add them one at a time
 - **Hover over a node** to highlight all ancestor classes up to the root
 - **Drag to pan**, scroll to zoom the graph
+
+#### Images
+
+Visualize image data stored in byte arrays:
+
+```lisp
+;; Load an image file into a byte vector
+(defvar *img* (alexandria:read-file-into-byte-vector #P"photo.png"))
+,viz *img*
+```
+
+Supported formats (detected by magic bytes): PNG, JPEG, GIF, WebP.
+
+#### JSON and Code
+
+JSON strings are automatically pretty-printed with syntax highlighting:
+
+```lisp
+(defvar *data* "{\"name\": \"Alice\", \"scores\": [95, 87, 92]}")
+,viz *data*
+```
+
+All visualization panels auto-refresh after REPL evaluations.
 
 ### Configuration
 

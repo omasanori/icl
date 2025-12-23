@@ -863,6 +863,13 @@
                                                  (and (>= (length trimmed) 4)
                                                       (string-equal (subseq trimmed 0 4) \"<svg\")))))
                                       (list :svg obj))
+                                     ;; JSON string (starts with { or [)
+                                     ((and (stringp obj)
+                                           (let ((trimmed (string-left-trim '(#\\Space #\\Tab #\\Newline) obj)))
+                                             (and (> (length trimmed) 0)
+                                                  (or (char= (char trimmed 0) #\\{)
+                                                      (char= (char trimmed 0) #\\[)))))
+                                      (list :json obj))
                                      ;; Hash table
                                      ((hash-table-p obj)
                                       (list :hash-table
@@ -870,6 +877,29 @@
                                             (loop for k being the hash-keys of obj using (hash-value v)
                                                   for i from 0 below 100
                                                   collect (list (princ-to-string k) (princ-to-string v)))))
+                                     ;; Image byte array (check magic bytes)
+                                     ((and (typep obj '(simple-array (unsigned-byte 8) (*)))
+                                           (>= (length obj) 4)
+                                           (or ;; PNG
+                                               (and (= (aref obj 0) #x89) (= (aref obj 1) #x50)
+                                                    (= (aref obj 2) #x4E) (= (aref obj 3) #x47))
+                                               ;; JPEG
+                                               (and (= (aref obj 0) #xFF) (= (aref obj 1) #xD8) (= (aref obj 2) #xFF))
+                                               ;; GIF
+                                               (and (= (aref obj 0) #x47) (= (aref obj 1) #x49)
+                                                    (= (aref obj 2) #x46) (= (aref obj 3) #x38))
+                                               ;; WebP
+                                               (and (>= (length obj) 12)
+                                                    (= (aref obj 0) #x52) (= (aref obj 1) #x49)
+                                                    (= (aref obj 2) #x46) (= (aref obj 3) #x46)
+                                                    (= (aref obj 8) #x57) (= (aref obj 9) #x45)
+                                                    (= (aref obj 10) #x42) (= (aref obj 11) #x50))))
+                                      (let ((mime (cond
+                                                    ((and (= (aref obj 0) #x89) (= (aref obj 1) #x50)) \"image/png\")
+                                                    ((and (= (aref obj 0) #xFF) (= (aref obj 1) #xD8)) \"image/jpeg\")
+                                                    ((and (= (aref obj 0) #x47) (= (aref obj 1) #x49)) \"image/gif\")
+                                                    (t \"image/webp\"))))
+                                        (list :image-bytes mime (icl-runtime:usb8-array-to-base64-string obj))))
                                      ;; Unknown type
                                      (t (list :unknown (princ-to-string (type-of obj))))))"
                             source-expr))
@@ -886,10 +916,19 @@
               ((and (listp parsed) (eq (first parsed) :svg))
                (setf (gethash "vizType" obj) "svg")
                (setf (gethash "content" obj) (second parsed)))
+              ((and (listp parsed) (eq (first parsed) :json))
+               (setf (gethash "vizType" obj) "json")
+               (setf (gethash "content" obj) (second parsed)))
               ((and (listp parsed) (eq (first parsed) :hash-table))
                (setf (gethash "vizType" obj) "hash-table")
                (setf (gethash "count" obj) (second parsed))
                (setf (gethash "entries" obj) (third parsed)))
+              ((and (listp parsed) (eq (first parsed) :image-bytes))
+               (let* ((mime (second parsed))
+                      (base64 (third parsed))
+                      (data-url (format nil "data:~A;base64,~A" mime base64)))
+                 (setf (gethash "vizType" obj) "image")
+                 (setf (gethash "imageUrl" obj) data-url)))
               (t
                (setf (gethash "vizType" obj) "unknown")
                (setf (gethash "error" obj) (format nil "Unknown type: ~A" parsed))))
@@ -954,6 +993,29 @@
         (setf (gethash "type" obj) "open-html")
         (setf (gethash "title" obj) title)
         (setf (gethash "content" obj) content)
+        (setf (gethash "sourceExpr" obj) source-expr)
+        (hunchensocket:send-text-message client (com.inuoe.jzon:stringify obj))))))
+
+(defun open-json-panel (title content source-expr)
+  "Send message to browser to open a JSON visualization panel."
+  (when *repl-resource*
+    (dolist (client (hunchensocket:clients *repl-resource*))
+      (let ((obj (make-hash-table :test 'equal)))
+        (setf (gethash "type" obj) "open-json")
+        (setf (gethash "title" obj) title)
+        (setf (gethash "content" obj) content)
+        (setf (gethash "sourceExpr" obj) source-expr)
+        (hunchensocket:send-text-message client (com.inuoe.jzon:stringify obj))))))
+
+(defun open-image-panel (title image-url content-type source-expr)
+  "Send message to browser to open an image visualization panel."
+  (when *repl-resource*
+    (dolist (client (hunchensocket:clients *repl-resource*))
+      (let ((obj (make-hash-table :test 'equal)))
+        (setf (gethash "type" obj) "open-image")
+        (setf (gethash "title" obj) title)
+        (setf (gethash "imageUrl" obj) image-url)
+        (setf (gethash "contentType" obj) content-type)
         (setf (gethash "sourceExpr" obj) source-expr)
         (hunchensocket:send-text-message client (com.inuoe.jzon:stringify obj))))))
 
@@ -1362,6 +1424,7 @@
   <title>ICL Browser</title>
   <link rel='stylesheet' href='/assets/dockview.css'>
   <link rel='stylesheet' href='/assets/xterm.css'>
+  <link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css' id='hljs-theme'>
   <style>
     /* Default theme variables (will be overridden by server-sent theme) */
     :root {
@@ -1420,6 +1483,7 @@
   <script src='/assets/xterm.min.js'></script>
   <script src='/assets/xterm-addon-fit.min.js'></script>
   <script src='/assets/viz-standalone.js'></script>
+  <script src='https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js'></script>
   <script>
     // WebSocket connection
     const ws = new WebSocket('ws://' + location.host + '/ws/~A');
@@ -1516,6 +1580,12 @@
           break;
         case 'open-html':
           openHtmlPanel(msg.title, msg.content, msg.sourceExpr);
+          break;
+        case 'open-json':
+          openJsonPanel(msg.title, msg.content, msg.sourceExpr);
+          break;
+        case 'open-image':
+          openImagePanel(msg.title, msg.imageUrl, msg.contentType, msg.sourceExpr);
           break;
         case 'refresh-visualizations':
           refreshAllVisualizations();
@@ -1710,6 +1780,69 @@
       }
     }
 
+    // Open JSON panel - tracks by source expression for updates
+    function openJsonPanel(title, content, sourceExpr) {
+      console.log('openJsonPanel called:', title, content?.length, sourceExpr);
+      const panelId = 'json-' + sanitizeForPanelId(sourceExpr);
+      if (dockviewApi) {
+        // Check if panel already exists via vizStates
+        if (vizStates.has(panelId)) {
+          console.log('Updating existing JSON panel');
+          const state = vizStates.get(panelId);
+          if (state && state.element) {
+            renderJson(state.element, content);
+          }
+        } else {
+          console.log('Creating new JSON panel');
+          dockviewApi.addPanel({
+            id: panelId,
+            component: 'json',
+            title: title || 'JSON',
+            params: { content, sourceExpr, panelId },
+            position: { referencePanel: 'terminal', direction: 'right' }
+          });
+        }
+      }
+    }
+
+    // Open Image panel - tracks by source expression for updates
+    function openImagePanel(title, imageUrl, contentType, sourceExpr) {
+      console.log('openImagePanel called:', title, imageUrl, contentType, sourceExpr);
+      const panelId = 'image-' + sanitizeForPanelId(sourceExpr);
+      if (dockviewApi) {
+        // Check if panel already exists via vizStates
+        if (vizStates.has(panelId)) {
+          console.log('Updating existing Image panel');
+          const state = vizStates.get(panelId);
+          if (state && state.element) {
+            renderImage(state.element, imageUrl);
+          }
+        } else {
+          console.log('Creating new Image panel');
+          dockviewApi.addPanel({
+            id: panelId,
+            component: 'image',
+            title: title || 'Image',
+            params: { imageUrl, contentType, sourceExpr, panelId },
+            position: { referencePanel: 'terminal', direction: 'right' }
+          });
+        }
+      }
+    }
+
+    // Render image into element
+    function renderImage(element, imageUrl) {
+      const img = document.createElement('img');
+      img.src = imageUrl;
+      img.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;display:block;margin:auto;';
+      img.onerror = () => {
+        element.innerHTML = '<div style=\"padding:20px;color:var(--fg-secondary);\">Failed to load image</div>';
+      };
+      element.innerHTML = '';
+      element.style.cssText = 'display:flex;align-items:center;justify-content:center;height:100%;background:var(--bg-primary);';
+      element.appendChild(img);
+    }
+
     // Refresh all visualization panels
     function refreshAllVisualizations() {
       // Refresh class graph panels (specialized - not expression-based)
@@ -1862,8 +1995,16 @@
             }
             break;
           }
+          case 'json': {
+            renderJson(state.element, msg.content);
+            break;
+          }
           case 'hash-table': {
             renderHashTable(state.element, msg.count, msg.entries);
+            break;
+          }
+          case 'image': {
+            renderImage(state.element, msg.imageUrl);
             break;
           }
           default:
@@ -1896,6 +2037,33 @@
       }
       html += '</tbody></table></div>';
       element.innerHTML = html;
+    }
+
+    // Render code/text with syntax highlighting via highlight.js
+    function renderJson(element, content) {
+      let formatted = content;
+      // Try to pretty-print if it looks like JSON
+      try {
+        const parsed = JSON.parse(content);
+        formatted = JSON.stringify(parsed, null, 2);
+      } catch (e) {
+        // Not valid JSON, use as-is
+      }
+
+      // Create pre/code structure for highlight.js
+      const pre = document.createElement('pre');
+      pre.style.cssText = 'margin:0;padding:12px;font-family:monospace;font-size:13px;' +
+        'background:var(--bg-primary);overflow:auto;height:100%;';
+      const code = document.createElement('code');
+      code.textContent = formatted;
+      pre.appendChild(code);
+      element.innerHTML = '';
+      element.appendChild(pre);
+
+      // Apply highlight.js with auto-detection
+      if (window.hljs) {
+        hljs.highlightElement(code);
+      }
     }
 
     // Open Venn diagram panel
@@ -1976,6 +2144,16 @@
           panel._render();
         }
       });
+
+      // Switch highlight.js theme based on dark/light mode
+      const hljsThemeLink = document.getElementById('hljs-theme');
+      if (hljsThemeLink && themeData.dockviewTheme) {
+        const isDark = themeData.dockviewTheme.includes('dark') ||
+                      themeData.dockviewTheme.includes('vs-dark') ||
+                      themeData.dockviewTheme === 'dockview-theme-dark';
+        const hljsTheme = isDark ? 'github-dark' : 'github';
+        hljsThemeLink.href = 'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/' + hljsTheme + '.min.css';
+      }
     }
 
     // Send dark mode preference on connect
@@ -2425,6 +2603,54 @@
         if (this._panelId) {
           registerVizPanel(this._panelId, this._sourceExpr, this._element, 'html');
           console.log('HtmlPanel registered:', this._panelId);
+        }
+      }
+    }
+
+    // JSON Panel - renders JSON/code with syntax highlighting
+    class JsonPanel {
+      constructor() {
+        this._element = document.createElement('div');
+        this._element.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg-primary);overflow:auto;';
+        this._panelId = null;
+        this._sourceExpr = null;
+      }
+      get element() { return this._element; }
+      init(params) {
+        this._panelId = params.params?.panelId || params.id;
+        this._sourceExpr = params.params?.sourceExpr;
+        const content = params.params?.content || '';
+        console.log('JsonPanel.init panelId:', this._panelId, 'sourceExpr:', this._sourceExpr);
+        // Render with highlight.js
+        renderJson(this._element, content);
+        // Register with unified vizStates
+        if (this._panelId) {
+          registerVizPanel(this._panelId, this._sourceExpr, this._element, 'json');
+          console.log('JsonPanel registered:', this._panelId);
+        }
+      }
+    }
+
+    // Image Panel - displays images
+    class ImagePanel {
+      constructor() {
+        this._element = document.createElement('div');
+        this._element.style.cssText = 'position:absolute;top:0;left:0;right:0;bottom:0;background:var(--bg-primary);display:flex;align-items:center;justify-content:center;';
+        this._panelId = null;
+        this._sourceExpr = null;
+      }
+      get element() { return this._element; }
+      init(params) {
+        this._panelId = params.params?.panelId || params.id;
+        this._sourceExpr = params.params?.sourceExpr;
+        const imageUrl = params.params?.imageUrl || '';
+        console.log('ImagePanel.init panelId:', this._panelId, 'sourceExpr:', this._sourceExpr);
+        // Render image
+        renderImage(this._element, imageUrl);
+        // Register with unified vizStates
+        if (this._panelId) {
+          registerVizPanel(this._panelId, this._sourceExpr, this._element, 'image');
+          console.log('ImagePanel registered:', this._panelId);
         }
       }
     }
@@ -3444,6 +3670,8 @@
           case 'hashtable': return new HashTablePanel();
           case 'svg': return new SvgPanel();
           case 'html': return new HtmlPanel();
+          case 'json': return new JsonPanel();
+          case 'image': return new ImagePanel();
           case 'venn': return new VennPanel();
           case 'graphviz': return new GraphvizPanel();
           case 'terminal': return new TerminalPanel();
@@ -3747,6 +3975,21 @@
    to refresh visualizations when Emacs/Sly evaluates expressions."
   (when *eval-generation-poller*
     (stop-eval-generation-poller))
+  ;; Install the listener-eval hook in the inferior Lisp
+  ;; This ensures only real REPL evaluations increment the counter
+  ;; Use find-symbol to avoid read-time package issues (package is in inferior, not ICL)
+  ;; Use cl-user:: for local vars to avoid ICL package reference in inferior
+  (handler-case
+      (with-slynk-connection
+        (slynk-client:slime-eval
+         '(cl:let ((cl-user::icl-pkg (cl:find-package :icl-runtime)))
+            (cl:when cl-user::icl-pkg
+              (cl:let ((cl-user::icl-sym (cl:find-symbol "SETUP-EVAL-GENERATION-HOOK" cl-user::icl-pkg)))
+                (cl:when (cl:and cl-user::icl-sym (cl:fboundp cl-user::icl-sym))
+                  (cl:funcall cl-user::icl-sym)))))
+         *slynk-connection*))
+    (error (e)
+      (format *error-output* "~&; Warning: Failed to setup eval hook: ~A~%" e)))
   (setf *last-eval-generation* -1)
   (setf *eval-generation-poller*
         (bt:make-thread
@@ -3755,18 +3998,25 @@
              (sleep 1)
              (handler-case
                  ;; Use with-slynk-connection for proper locking
-                 (let ((gen (ignore-errors
+                 ;; Use find-symbol to avoid read-time package issues
+                ;; (icl-runtime package exists in inferior, not in ICL process)
+                ;; Use cl-user:: for local vars to avoid ICL package reference in inferior
+                (let ((gen (ignore-errors
                               (with-slynk-connection
                                 (slynk-client:slime-eval
-                                 '(cl:if (cl:boundp (cl:quote cl-user::*icl-eval-generation*))
-                                         (cl:symbol-value (cl:quote cl-user::*icl-eval-generation*))
-                                         0)
+                                 '(cl:let ((cl-user::icl-pkg (cl:find-package :icl-runtime)))
+                                    (cl:if cl-user::icl-pkg
+                                        (cl:let ((cl-user::icl-sym (cl:find-symbol "*EVAL-GENERATION*" cl-user::icl-pkg)))
+                                          (cl:if (cl:and cl-user::icl-sym (cl:boundp cl-user::icl-sym))
+                                              (cl:symbol-value cl-user::icl-sym)
+                                              0))
+                                        0))
                                  *slynk-connection*)))))
-                   (when (and gen (numberp gen) (/= gen *last-eval-generation*))
-                     (setf *last-eval-generation* gen)
-                     ;; Don't refresh on first poll (gen was -1)
-                     (when (>= *last-eval-generation* 0)
-                       (refresh-browser-visualizations))))
+                  (when (and gen (numberp gen) (/= gen *last-eval-generation*))
+                    (setf *last-eval-generation* gen)
+                    ;; Don't refresh on first poll (gen was -1)
+                    (when (>= *last-eval-generation* 0)
+                      (refresh-browser-visualizations))))
                (error (e)
                  (format *error-output* "~&; POLLER error: ~A~%" e)))
              ;; Exit if browser stopped

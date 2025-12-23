@@ -6,7 +6,7 @@
 ;; Author: Anthony Green <green@moxielogic.com>
 ;; Maintainer: Anthony Green <green@moxielogic.com>
 ;; URL: https://github.com/moxielogic/icl
-;; Version: 1.12.0
+;; Version: 1.13.0
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: lisp, tools, repl
 
@@ -111,24 +111,59 @@
       (add-hook 'slime-connection-closed-hook #'icl--on-sly-disconnect))
     (setq icl--sly-hooks-installed t)))
 
+(defconst icl--runtime-phase1
+  "(cl:progn
+     (cl:unless (cl:find-package :icl-runtime)
+       (cl:defpackage #:icl-runtime
+         (:use #:cl)
+         (:export #:usb8-array-to-base64-string
+                  #:*eval-generation*
+                  #:setup-eval-generation-hook)))
+     t)"
+  "Phase 1: Create ICL runtime package.")
+
+(defconst icl--runtime-phase2
+  "(in-package :icl-runtime)
+   (defvar *eval-generation* 0)
+   (defvar *eval-hook-installed* nil)
+   (defvar *original-mrepl-eval* nil)
+   (defvar *original-listener-eval* nil)
+   (defun setup-eval-generation-hook ()
+     (unless *eval-hook-installed*
+       ;; SLY uses slynk-mrepl::mrepl-eval for REPL evaluations
+       (when (find-package :slynk-mrepl)
+         (let ((fn-symbol (find-symbol \"MREPL-EVAL\" :slynk-mrepl)))
+           (when (and fn-symbol (fboundp fn-symbol))
+             (setf *original-mrepl-eval* (fdefinition fn-symbol))
+             (setf (fdefinition fn-symbol)
+                   (lambda (repl string)
+                     (prog1 (funcall *original-mrepl-eval* repl string)
+                       (incf *eval-generation*)))))))
+       ;; SLIME uses swank::listener-eval for REPL evaluations
+       (when (find-package :swank)
+         (let ((fn-symbol (find-symbol \"LISTENER-EVAL\" :swank)))
+           (when (and fn-symbol (fboundp fn-symbol))
+             (setf *original-listener-eval* (fdefinition fn-symbol))
+             (setf (fdefinition fn-symbol)
+                   (lambda (string)
+                     (prog1 (funcall *original-listener-eval* string)
+                       (incf *eval-generation*)))))))
+       (setf *eval-hook-installed* t))
+     t)"
+  "Phase 2: Define ICL runtime functions.")
+
 (defun icl--setup-eval-hook ()
-  "Set up eval generation counter in the Lisp image."
-  ;; All symbols must be fully qualified to CL-USER since slynk reads
-  ;; forms in its own package context
-  (icl--eval '(cl:progn
-               (cl:defvar cl-user::*icl-eval-generation* 0)
-               ;; Define the hook function
-               (cl:defun cl-user::icl-increment-eval-generation ()
-                 (cl:unless (cl:boundp (cl:quote cl-user::*icl-eval-generation*))
-                   (cl:setf cl-user::*icl-eval-generation* 0))
-                 (cl:incf cl-user::*icl-eval-generation*))
-               ;; Only add the hook if not already present
-               ;; Use slynk:: (internal) since *pre-reply-hook* is not exported
-               (cl:unless (cl:member (cl:quote cl-user::icl-increment-eval-generation)
-                                     slynk::*pre-reply-hook*)
-                 (cl:push (cl:quote cl-user::icl-increment-eval-generation)
-                          slynk::*pre-reply-hook*))
-               t)))
+  "Set up eval generation counter in the Lisp image.
+Uses icl-runtime package with wrappers around REPL eval functions
+\(slynk-mrepl::mrepl-eval for SLY, swank::listener-eval for SLIME)."
+  ;; Phase 1: Create the package
+  (icl--eval (read icl--runtime-phase1))
+  ;; Phase 2: Load definitions via string stream
+  (icl--eval `(cl:with-input-from-string (cl-user::icl-load-stream ,icl--runtime-phase2)
+                (cl:load cl-user::icl-load-stream)
+                t))
+  ;; Call the setup function to install the hook
+  (icl--eval '(icl-runtime:setup-eval-generation-hook)))
 
 ;;;###autoload
 (defun icl ()

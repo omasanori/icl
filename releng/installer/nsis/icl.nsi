@@ -82,6 +82,12 @@ Section "ICL Core" SEC_CORE
   File "..\..\..\assets\WEB-LICENSES"
   File "..\..\..\README.md"
 
+  ; Install Emacs integration
+  SetOutPath "$INSTDIR\share\emacs\site-lisp\icl"
+  File "..\..\..\icl.el"
+  File "..\..\..\icl-autoloads.el"
+  SetOutPath "$INSTDIR"
+
   ; Install bundled ASDF (for Lisps that don't bundle it)
   SetOutPath "$INSTDIR\3rd-party\asdf"
   File "..\..\..\3rd-party\asdf\asdf.lisp"
@@ -157,12 +163,18 @@ Section "Uninstall"
   Delete "$INSTDIR\THIRD-PARTY-LICENSES.txt"
   Delete "$INSTDIR\WEB-LICENSES"
   Delete "$INSTDIR\README.md"
+  Delete "$INSTDIR\share\emacs\site-lisp\icl\icl.el"
+  Delete "$INSTDIR\share\emacs\site-lisp\icl\icl-autoloads.el"
   Delete "$INSTDIR\uninstall.exe"
 
   ; Remove bundled ASDF
   Delete "$INSTDIR\3rd-party\asdf\asdf.lisp"
   RMDir "$INSTDIR\3rd-party\asdf"
   RMDir "$INSTDIR\3rd-party"
+  RMDir "$INSTDIR\share\emacs\site-lisp\icl"
+  RMDir "$INSTDIR\share\emacs\site-lisp"
+  RMDir "$INSTDIR\share\emacs"
+  RMDir "$INSTDIR\share"
 
   ; Remove shortcuts
   Delete "$SMPROGRAMS\${PRODUCT_NAME}\ICL.lnk"

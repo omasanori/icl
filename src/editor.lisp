@@ -144,6 +144,11 @@
       1
       (ceiling visible-len term-width)))
 
+(defun safe-term-width ()
+  "Return a non-zero terminal width for wrapping calculations."
+  (let ((w (or (get-terminal-size) 80)))
+    (if (and (integerp w) (> w 0)) w 80)))
+
 (defun calculate-cursor-visual-position (prompt-len col term-width)
   "Calculate the visual row offset and column for cursor at logical COL.
    PROMPT-LEN is the visible length of the prompt.
@@ -185,7 +190,7 @@
         ;; Get absolute cursor position for paren matching
         (cursor-pos (buffer-cursor-position buf))
         ;; Get terminal width for wrapping calculations
-        (term-width (or (get-terminal-size) 80)))
+        (term-width (safe-term-width)))
     ;; Move up to line 0 from current screen position
     (when (plusp *screen-row*)
       (cursor-up *screen-row*))
@@ -221,7 +226,7 @@
         (cursor-row (edit-buffer-row buf))
         (cursor-col (edit-buffer-col buf))
         (full-content (buffer-contents buf))
-        (term-width (or (get-terminal-size) 80)))
+        (term-width (safe-term-width)))
     ;; Move up to line 0 from current screen position
     (when (plusp *screen-row*)
       (cursor-up *screen-row*))
@@ -259,7 +264,7 @@
          (prompt (buffer-prompt-for-line buf row))
          (line (buffer-line buf row))
          (prompt-len (visible-string-length prompt))
-         (term-width (or (get-terminal-size) 80))
+         (term-width (safe-term-width))
          (line-total-len (+ prompt-len (visible-string-length line))))
     ;; If line wraps, we need a full redraw to handle visual rows correctly
     (if (> line-total-len term-width)
@@ -1062,8 +1067,11 @@
               (:cancel :cancel)
               (otherwise result)))
         (error (e)
-          (declare (ignore e))
-          ;; Fall back on any error
-          :not-a-tty))
+          (if *browser-terminal-active*
+              (progn
+                (format *error-output* "~&;; Browser REPL editor error: ~A~%" e)
+                :cancel)
+              ;; Fall back on any error for non-browser terminals
+              :not-a-tty)))
       ;; Non-interactive: signal to use fallback
       :not-a-tty))

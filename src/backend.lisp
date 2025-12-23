@@ -484,7 +484,11 @@
     (unless (inferior-lisp-alive-p)
       (start-inferior-lisp))
     (unless *slynk-connected-p*
-      (error "Cannot connect to Slynk backend"))))
+      (error "Cannot connect to Slynk backend")))
+  ;; Inject ICL runtime on first use
+  (unless *icl-runtime-injected*
+    (inject-icl-runtime)
+    (setf *icl-runtime-injected* t)))
 
 (defun backend-eval (string)
   "Evaluate STRING using the Slynk backend.

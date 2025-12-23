@@ -1292,6 +1292,46 @@ Examples:
                                                (and (>= (length trimmed) 5)
                                                     (string-equal (subseq trimmed 0 5) \"<html\")))))
                                     (list :html obj))
+                                   ;; JSON string detection
+                                   ((and (stringp obj)
+                                         (let ((trimmed (string-left-trim '(#\\Space #\\Tab #\\Newline) obj)))
+                                           (and (> (length trimmed) 0)
+                                                (or (char= (char trimmed 0) #\\{)
+                                                    (char= (char trimmed 0) #\\[)))))
+                                    (list :json obj))
+                                   ;; Image byte array detection (check magic bytes)
+                                   ((and (typep obj '(simple-array (unsigned-byte 8) (*)))
+                                         (>= (length obj) 4)
+                                         (or ;; PNG: 89 50 4E 47
+                                             (and (= (aref obj 0) #x89)
+                                                  (= (aref obj 1) #x50)
+                                                  (= (aref obj 2) #x4E)
+                                                  (= (aref obj 3) #x47))
+                                             ;; JPEG: FF D8 FF
+                                             (and (= (aref obj 0) #xFF)
+                                                  (= (aref obj 1) #xD8)
+                                                  (= (aref obj 2) #xFF))
+                                             ;; GIF: GIF8
+                                             (and (= (aref obj 0) #x47)
+                                                  (= (aref obj 1) #x49)
+                                                  (= (aref obj 2) #x46)
+                                                  (= (aref obj 3) #x38))
+                                             ;; WebP: RIFF....WEBP
+                                             (and (>= (length obj) 12)
+                                                  (= (aref obj 0) #x52)
+                                                  (= (aref obj 1) #x49)
+                                                  (= (aref obj 2) #x46)
+                                                  (= (aref obj 3) #x46)
+                                                  (= (aref obj 8) #x57)
+                                                  (= (aref obj 9) #x45)
+                                                  (= (aref obj 10) #x42)
+                                                  (= (aref obj 11) #x50))))
+                                    (let ((mime (cond
+                                                  ((and (= (aref obj 0) #x89) (= (aref obj 1) #x50)) \"image/png\")
+                                                  ((and (= (aref obj 0) #xFF) (= (aref obj 1) #xD8)) \"image/jpeg\")
+                                                  ((and (= (aref obj 0) #x47) (= (aref obj 1) #x49)) \"image/gif\")
+                                                  (t \"image/webp\"))))
+                                      (list :image-bytes mime (icl-runtime:usb8-array-to-base64-string obj))))
                                    (t (list :unknown (type-of obj) (princ-to-string obj)))))))"
                         trimmed))
          (result (backend-eval-internal query)))
@@ -1333,6 +1373,16 @@ Examples:
            (let ((content (second parsed)))
              (open-html-panel trimmed content trimmed)
              (format t "~&; Visualizing HTML content~%")))
+          (:json
+           (let ((content (second parsed)))
+             (open-json-panel trimmed content trimmed)
+             (format t "~&; Visualizing JSON content~%")))
+          (:image-bytes
+           (let* ((mime (second parsed))
+                  (base64 (third parsed))
+                  (data-url (format nil "data:~A;base64,~A" mime base64)))
+             (open-image-panel "Image" data-url mime trimmed)
+             (format t "~&; Visualizing image (~A, ~A bytes)~%" mime (length base64))))
           (:symbol
            (format t "~&; Symbol ~A is not a class name~%" (second parsed)))
           (:unknown
