@@ -47,6 +47,8 @@ Profile any expression with `,flame` and explore the results in an interactive [
 - **Terminal-aware colors** - Automatically detects light/dark terminal background
 - **AI integration** - Use `,explain` to get AI-powered explanations of code, errors, and results
 - **Browser interface** - Web UI with package browser, symbol list, inspector, and xterm.js terminal
+- **Data visualization** - Visualize hash tables, classes, sets, SVG, HTML, JSON, and Vega-Lite charts
+- **Custom visualizations** - Define `icl-runtime:visualize` methods for your own classes
 - **Flame graph profiling** - Interactive Speedscope visualizations for performance analysis (SBCL)
 - **Emacs integration** - Works with SLY/SLIME for synchronized browser visualization
 
