@@ -1476,7 +1476,7 @@ Note: For full interactive stepping, connect to Slynk from SLY/SLIME."
       (unwind-protect
           (let ((result (multiple-value-list (eval parsed))))
             (let ((trace-str (get-output-stream-string *trace-output*)))
-              (format nil \"~~@[Trace:~~%%~~A~~%%~~]Result: ~~{~~S~~^, ~~}\"
+              (format nil \"~~@[Trace:~~%~~A~~%~~]Result: ~~{~~S~~^, ~~}\"
                       (if (plusp (length trace-str)) trace-str nil)
                       result)))
         ;; Untrace everything
@@ -1549,20 +1549,21 @@ Example: ,ql cl-ppcre"
                            (find-symbol \"*VERBOSE*\" '#:OCICL-RUNTIME))
                   (list t nil)
                 (asdf:load-system system))
-              (format t \"~~&Loaded ~~A via ocicl~~%%\" system))
+              (format t \"~~&Loaded ~~A via ocicl~~%\" system))
              ;; Try Quicklisp
              ((find-package '#:QUICKLISP)
               (funcall (find-symbol \"QUICKLOAD\" '#:QUICKLISP) system :silent nil)
-              (format t \"~~&Loaded ~~A via Quicklisp~~%%\" system))
+              (format t \"~~&Loaded ~~A via Quicklisp~~%\" system))
              ;; Fall back to plain ASDF
              ((find-package '#:ASDF)
               (asdf:load-system system)
-              (format t \"~~&Loaded ~~A via ASDF~~%%\" system))
+              (format t \"~~&Loaded ~~A via ASDF~~%\" system))
              (t
               (error \"No system loader available (ocicl, Quicklisp, or ASDF)\"))))))
   (try-load)
   (values))" name)))
     (backend-eval-internal loader-code)
+    (fresh-line)
     nil))
 
 ;;; ─────────────────────────────────────────────────────────────────────────────

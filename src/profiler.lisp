@@ -87,13 +87,13 @@ SAMPLE-INTERVAL is the sampling interval in seconds (default 0.001)."
                            sb-sprof::*samples*)
                           ;; Convert tree to folded stacks
                           (with-output-to-string (s)
-                            (format s \";; ~~D traces processed~~%%\" trace-count)
+                            (format s \";; ~~D traces processed~~%\" trace-count)
                             (labels ((walk (node path)
                                        (maphash (lambda (name child)
                                                   (let ((new-path (append path (list name)))
                                                         (count (car child))
                                                         (children (cdr child)))
-                                                    (format s \"~~{~~A~~^;~~} ~~D~~%%\" new-path count)
+                                                    (format s \"~~{~~A~~^;~~} ~~D~~%\" new-path count)
                                                     (walk children new-path)))
                                                 node)))
                               (walk root nil)))))))"

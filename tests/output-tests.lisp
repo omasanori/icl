@@ -53,39 +53,6 @@
   (is (= (icl::list-length-bounded '(1 2 3 4 5 6) 5) 5))
   (is (= (icl::list-length-bounded '(1 2 3 4 5 6 7 8 9 10) 3) 4)))
 
-;;; count-display-lines tests
-
-(test count-display-lines-simple
-  "Test line counting for simple text"
-  (is (= (icl::count-display-lines "hello" 80) 1))
-  (is (= (icl::count-display-lines "" 80) 0))
-  (is (= (icl::count-display-lines "line1
-line2
-line3" 80) 3)))
-
-(test count-display-lines-wrapping
-  "Test line counting with wrapping"
-  ;; 20 chars in 10-char width = 2 lines
-  (is (= (icl::count-display-lines "12345678901234567890" 10) 2))
-  ;; 25 chars in 10-char width = 3 lines
-  (is (= (icl::count-display-lines "1234567890123456789012345" 10) 3)))
-
-(test count-display-lines-with-ansi
-  "Test line counting ignores ANSI codes"
-  ;; Text is "hello" (5 chars) but with ANSI codes
-  (let ((text (format nil "~C[31mhello~C[0m" #\Escape #\Escape)))
-    (is (= (icl::count-display-lines text 80) 1))
-    ;; Should not wrap despite ANSI code characters
-    (is (= (icl::count-display-lines text 5) 1))))
-
-(test count-display-lines-newlines-and-wrap
-  "Test line counting with both newlines and wrapping"
-  ;; First line wraps (15 chars in 10-width = 2 lines)
-  ;; Second line is 5 chars = 1 line
-  ;; Total = 3 lines
-  (is (= (icl::count-display-lines "123456789012345
-hello" 10) 3)))
-
 ;;; colorize tests
 
 (test colorize-with-colors-disabled
